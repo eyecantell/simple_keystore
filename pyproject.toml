@@ -23,6 +23,10 @@ dev = []
 [tool.ruff.lint.isort]
 combine-as-imports = true
 
+[tool.ruff]
+# Allow lines to be as long as 120.
+line-length = 120
+
 [project.urls]
 Repository = "https://github.com/eyecantell/simple_keystore"
 Issues = "https://github.com/eyecantell/simple_keystore/issues"
