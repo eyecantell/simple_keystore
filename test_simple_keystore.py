@@ -12,7 +12,7 @@ def test_key_is_added_encrypted():
 
     cursor = ks.cx.execute("SELECT * from keystore WHERE name=?", (my_key_name,))
     for r in cursor.fetchall():
-        #print(f"{r=}")
+        # print(f"{r=}")
         for field in r:
             assert field != my_key_value, f"Found unencrypted key value in {r}"
 
@@ -59,9 +59,7 @@ def test_add_and_retrieve_named_key_with_all_fields():
     )
 
     retrieved_key_list = ks.get_matching_key_records(name=my_key_name)
-    assert (
-        len(retrieved_key_list) == 1
-    ), f"Expected one '{my_key_name}' key, but got {len(retrieved_key_list)}"
+    assert len(retrieved_key_list) == 1, f"Expected one '{my_key_name}' key, but got {len(retrieved_key_list)}"
     retrieved_key_info = retrieved_key_list[0]
     for field in key_info.keys():
         assert retrieved_key_info.get(field), f"No '{field}' in {retrieved_key_info=}"
@@ -84,9 +82,13 @@ def test_build_where_clause_and_values():
         source="mysource",
     )
 
-    expected_where_clause = ' WHERE name = ? AND expiration_in_sse = ? AND batch = ? AND source = ? AND login = ? AND active = 1'
-    expected_values = ['myname', 123456, 'mybatch', 'mysource', 'mylogin']
-    assert where_clause == expected_where_clause, f"Expected where_clause to be \n'{expected_where_clause}'\n but got \n'{where_clause}'"
+    expected_where_clause = (
+        " WHERE name = ? AND expiration_in_sse = ? AND batch = ? AND source = ? AND login = ? AND active = 1"
+    )
+    expected_values = ["myname", 123456, "mybatch", "mysource", "mylogin"]
+    assert (
+        where_clause == expected_where_clause
+    ), f"Expected where_clause to be \n'{expected_where_clause}'\n but got \n'{where_clause}'"
     assert values == expected_values, f"Expected values to be {expected_values} but got {values}"
 
     # Try again with only a few fields
@@ -95,9 +97,11 @@ def test_build_where_clause_and_values():
         login="mylogin",
         source="mysource",
     )
-    expected_where_clause = ' WHERE expiration_in_sse = ? AND source = ? AND login = ?'
-    expected_values = [123456, 'mysource', 'mylogin']
-    assert where_clause == expected_where_clause, f"Expected where_clause to be \n'{expected_where_clause}'\n but got \n'{where_clause}'"
+    expected_where_clause = " WHERE expiration_in_sse = ? AND source = ? AND login = ?"
+    expected_values = [123456, "mysource", "mylogin"]
+    assert (
+        where_clause == expected_where_clause
+    ), f"Expected where_clause to be \n'{expected_where_clause}'\n but got \n'{where_clause}'"
     assert values == expected_values, f"Expected values to be {expected_values} but got {values}"
 
     # Try again with only a few fields and one set to None (should be ignored)
@@ -105,13 +109,56 @@ def test_build_where_clause_and_values():
         expiration_in_sse=123456,
         login="mylogin",
         source="mysource",
-        batch = None,
+        batch=None,
     )
-    expected_where_clause = ' WHERE expiration_in_sse = ? AND source = ? AND login = ?'
-    expected_values = [123456, 'mysource', 'mylogin']
-    assert where_clause == expected_where_clause, f"Expected where_clause to be \n'{expected_where_clause}'\n but got \n'{where_clause}'"
+    expected_where_clause = " WHERE expiration_in_sse = ? AND source = ? AND login = ?"
+    expected_values = [123456, "mysource", "mylogin"]
+    assert (
+        where_clause == expected_where_clause
+    ), f"Expected where_clause to be \n'{expected_where_clause}'\n but got \n'{where_clause}'"
     assert values == expected_values, f"Expected values to be {expected_values} but got {values}"
 
+
+def test_delete_matching_key_records():
+    my_key_name = "test_delete_matching_key_records"
+    my_key_value = "123abc_" + my_key_name
+    ks.delete_records_with_name(my_key_name)
+
+    # Add records in two batches, then delete one of the batches and make sure the other remains
+    # Batch one has active and inactive keys: active = True/False, batch='one'
+    # Batch two has active and inactive keys: active = True/False, batch='two'
+    for i in range(4):
+        for active in [True, False]:
+            for batch in ["one", "two"]:
+                ks.add_key(
+                    name=my_key_name,
+                    unencrypted_key=my_key_value,
+                    active=active,
+                    batch=batch,
+                    source=str(i) + ", " + str(active) + ", " + batch,
+                )
+
+    """print ("Created records:")
+    for r in ks.get_matching_key_records(name=my_key_name):
+        print(f"    {r['name']}, {r['active']}, {r['batch']}, {r['source']}")"""
+
+    # Delete batch one and verfiy all thats left is batch two
+    ks.delete_matching_key_records(name=my_key_name, batch="one")
+    print("Remaining records after deleting batch one:")
+    for r in ks.get_matching_key_records(name=my_key_name):
+        print(f"     {r['name']}, {r['active']}, {r['batch']}, {r['source']}")
+        assert r["batch"] == "two", f"Expected all remaining records to be in batch two, but got {r=}"
+
+    # Delete the inactive records and verify all thats left is batch two, active
+    ks.delete_matching_key_records(name=my_key_name, active=False)
+    print("Remaining records after deleting inactive records:")
+    for r in ks.get_matching_key_records(name=my_key_name):
+        print(f"     {r['name']}, {r['active']}, {r['batch']}, {r['source']}")
+        assert r["batch"] == "two", f"Expected all remaining records to be in batch two, but got {r=}"
+        assert r["active"] == True, f"Expected all remaining records to be active, but got {r=}"
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
 
 
 if __name__ == "__main__":
@@ -119,3 +166,4 @@ if __name__ == "__main__":
     test_add_and_retrieve_named_key_without_other_data()
     test_add_and_retrieve_named_key_with_all_fields()
     test_build_where_clause_and_values()
+    test_delete_matching_key_records()
