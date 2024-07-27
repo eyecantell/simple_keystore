@@ -165,8 +165,9 @@ def test_tabulate_records_matching():
             new_ids.append(ks.add_key(name=my_key_name, unencrypted_key=my_key_value, active=active, batch=batch))
 
     # Tabulate the records
-    tabulated = ks.tabulate_records_matching(name=my_key_name)
-    #print(tabulated)
+    records = ks.get_matching_key_records(name=my_key_name)
+    tabulated = ks.tabulate_records(records)
+    print(tabulated)
     for header in ["id", "name", "expiration_in_sse", "active", "batch", "source", "login", "encrypted_key", "key"]:
         assert header in tabulated, f"Expected {header=} in tabulated, but did not find it: \n{tabulated}"
 

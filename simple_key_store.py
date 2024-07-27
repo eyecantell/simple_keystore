@@ -243,30 +243,13 @@ class SimpleKeyStore:
 
         return cursor
 
-    def tabulate_records_matching(
-        self,
-        name: str = None,
-        active: bool = None,
-        expiration_in_sse: int = None,
-        batch: str = None,
-        source: str = None,
-        login: str = None,
-    ) -> str:
-        # Get the matching records
-        data = self.get_matching_key_records(
-            name=name,
-            active=active,
-            expiration_in_sse=expiration_in_sse,
-            batch=batch,
-            source=source,
-            login=login,
-        )
+    def tabulate_records(self, records : List) -> str:
 
         # Extracting the keys to use as headers
-        headers = data[0].keys() if data else []
+        headers = records[0].keys() if records else []
 
         # Creating the table using the tabulate module
-        table = [[str(item.get(header, ""))[:25] for header in headers] for item in data]
+        table = [[str(item.get(header, ""))[:25] for header in headers] for item in records]
 
         # Displaying the table with keys as headers
-        return tabulate(table, headers=headers, tablefmt="grid")
+        return tabulate(table, headers=headers)
