@@ -81,11 +81,12 @@ class SimpleKeyStore:
         batch: str = None,
         source: str = None,
         login: str = None,
-    ):
+    ) -> int:
+        '''Add a new key record. Returns the newly created id'''
         self.create_keystore_table_if_dne()
         active_value = 1 if active else 0
         encrypted_key = self.cipher.encrypt(unencrypted_key.encode())
-        self.cx.execute(
+        cursor = self.cx.execute(
             f"INSERT INTO {self.KEYSTORE_TABLE_NAME} \
                         (name, expiration_in_sse, active, batch, source, login, encrypted_key) VALUES (?,?,?,?,?,?,?)",
             (
@@ -99,6 +100,7 @@ class SimpleKeyStore:
             ),
         )
         self.cx.commit()
+        return cursor.lastrowid
 
     def record_dicts_from_select_star_results(self, records: list) -> List[Dict]:
         records_list = []
@@ -112,7 +114,10 @@ class SimpleKeyStore:
         record_data = {}
         i = 0
         for c in self.keystore_columns():
-            record_data[c] = record[i]
+            if c == 'active':
+                record_data[c] = True if record[i] else False
+            else:
+                record_data[c] = record[i]
             i = i + 1
 
         if include_unencrypted_key:
