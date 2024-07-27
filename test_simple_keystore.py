@@ -155,7 +155,7 @@ def test_delete_matching_key_records():
     for r in ks.get_matching_key_records(name=my_key_name):
         print(f"     {r['name']}, {r['active']}, {r['batch']}, {r['source']}")
         assert r["batch"] == "two", f"Expected all remaining records to be in batch two, but got {r=}"
-        assert r["active"] == True, f"Expected all remaining records to be active, but got {r=}"
+        assert r["active"] is True, f"Expected all remaining records to be active, but got {r=}"
 
     # Clean up
     ks.delete_records_with_name(my_key_name)
