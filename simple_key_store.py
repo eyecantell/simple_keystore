@@ -37,9 +37,7 @@ class SimpleKeyStore:
                 simple_keystore_key = None
 
         if not simple_keystore_key:
-            raise ValueError(
-                "Could not retrieve SIMPLE_KEYSTORE_KEY, was it set in the environment?"
-            )
+            raise ValueError("Could not retrieve SIMPLE_KEYSTORE_KEY, was it set in the environment?")
 
         return simple_keystore_key
 
@@ -119,10 +117,8 @@ class SimpleKeyStore:
 
         if include_unencrypted_key:
             # Decrypt the key
-            record_data["key"] = self.cipher.decrypt(
-                record_data["encrypted_key"]
-            ).decode()
-        #print(f"{record_data=}")
+            record_data["key"] = self.cipher.decrypt(record_data["encrypted_key"]).decode()
+        # print(f"{record_data=}")
         return record_data
 
     def get_key(self, name: str) -> str:
@@ -138,13 +134,11 @@ class SimpleKeyStore:
         """Close the db connection (if open)"""
         if self.cx:
             self.cx.close()
-            #print("SQLite connection closed.")
+            # print("SQLite connection closed.")
 
     def delete_records_with_name(self, name: str) -> int:
         """Delete any records with the given name. Returns number of records deleted"""
-        cursor = self.cx.execute(
-            f"DELETE FROM {self.KEYSTORE_TABLE_NAME} WHERE name=?", (name,)
-        )
+        cursor = self.cx.execute(f"DELETE FROM {self.KEYSTORE_TABLE_NAME} WHERE name=?", (name,))
         # print(f"Deleted {cursor.rowcount} records with {name=}")
         return cursor.rowcount
 
@@ -161,26 +155,58 @@ class SimpleKeyStore:
 
         # Construct the base query
         query = f"SELECT * FROM {self.KEYSTORE_TABLE_NAME}"
-        
+
         where_clause, values = self._build_where_clause_and_values(
             name=name,
             active=active,
             expiration_in_sse=expiration_in_sse,
             batch=batch,
             source=source,
-            login=login
+            login=login,
         )
 
-        # Join all conditions with 'AND'
+        # Add the WHERE clause
         query += where_clause
-        #print(f"get_matching_key_records: {query=}")
+        # print(f"get_matching_key_records: {query=}")
 
         # Execute the query with parameterized values
         cursor = self.cx.execute(query, tuple(values))
         matching_records = self.record_dicts_from_select_star_results(cursor.fetchall())
-        #print(f"{matching_records=}")
+        # print(f"{matching_records=}")
 
         return matching_records
+
+    def delete_matching_key_records(
+        self,
+        name: str = None,
+        active: bool = None,
+        expiration_in_sse: int = None,
+        batch: str = None,
+        source: str = None,
+        login: str = None,
+    ) -> int:
+        """Delete the keystore records matching the given parameters. Any parameters that are None are ignored.
+        Returns number of records deleted"""
+
+        # Construct the base query
+        query = f"DELETE FROM {self.KEYSTORE_TABLE_NAME}"
+
+        where_clause, values = self._build_where_clause_and_values(
+            name=name,
+            active=active,
+            expiration_in_sse=expiration_in_sse,
+            batch=batch,
+            source=source,
+            login=login,
+        )
+
+        # Add the WHERE clause
+        query += where_clause
+        # print(f"get_matching_key_records: {query=}")
+
+        # Execute the query with parameterized values
+        cursor = self.cx.execute(query, tuple(values))
+        return cursor.rowcount
 
     def _build_where_clause_and_values(self, **kwargs) -> Tuple[str, List[Any]]:
         """Build the WHERE clause for a keystore query based on the provided key-value pairs."""
@@ -195,7 +221,7 @@ class SimpleKeyStore:
                 conditions.append(field + " = ?")
                 values.append(kwargs[field])
 
-        if "active" in kwargs and kwargs['active'] is not None:
+        if "active" in kwargs and kwargs["active"] is not None:
             conditions.append("active = 1" if kwargs["active"] else "active = 0")
 
         # Join all conditions with 'AND'
