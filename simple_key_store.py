@@ -1,7 +1,8 @@
 from cryptography.fernet import Fernet
-from typing import Any, Dict, List, Tuple
-import sqlite3
+from tabulate import tabulate
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
 import os
+import sqlite3
 
 
 class SimpleKeyStore:
@@ -42,6 +43,7 @@ class SimpleKeyStore:
         return simple_keystore_key
 
     def create_keystore_table_if_dne(self):
+        """Create the keystore table if it does not yet exist"""
         self.cx.execute(
             f"CREATE TABLE IF NOT EXISTS {self.KEYSTORE_TABLE_NAME} ( \
                 id INTEGER PRIMARY KEY, \
@@ -82,7 +84,7 @@ class SimpleKeyStore:
         source: str = None,
         login: str = None,
     ) -> int:
-        '''Add a new key record. Returns the newly created id'''
+        """Add a new key record. Returns the newly created id"""
         self.create_keystore_table_if_dne()
         active_value = 1 if active else 0
         encrypted_key = self.cipher.encrypt(unencrypted_key.encode())
@@ -114,7 +116,7 @@ class SimpleKeyStore:
         record_data = {}
         i = 0
         for c in self.keystore_columns():
-            if c == 'active':
+            if c == "active":
                 record_data[c] = True if record[i] else False
             else:
                 record_data[c] = record[i]
@@ -126,14 +128,23 @@ class SimpleKeyStore:
         # print(f"{record_data=}")
         return record_data
 
-    def get_key(self, name: str) -> str:
-        """Returns enencrypted key value for the key of the given name. Will raise error if more than one key of this name is found"""
+    def get_key_by_name(self, name: str) -> str:
+        """Returns unencrypted key value for the key of the given name. Will raise error if more than one key of this name is found"""
 
         records = self.get_matching_key_records(name=name)
         if len(records) != 1:
             raise ValueError(f"Got {len(records)} records with {name=}\n{records=}\n")
 
         return records[0]["key"]
+
+    def get_key_record_by_id(self, id: int) -> Dict:
+        """Returns key record for the key with the given id."""
+
+        cursor = self.cx.execute(f"SELECT * FROM {self.KEYSTORE_TABLE_NAME} WHERE id={int(id)}")
+        records = self.record_dicts_from_select_star_results(cursor.fetchall())
+        if not records:
+            return None
+        return records[0]
 
     def close_connection(self):
         """Close the db connection (if open)"""
@@ -161,7 +172,8 @@ class SimpleKeyStore:
         # Construct the base query
         query = f"SELECT * FROM {self.KEYSTORE_TABLE_NAME}"
 
-        where_clause, values = self._build_where_clause_and_values(
+        cursor = self.run_query_with_where_clause(
+            query=query,
             name=name,
             active=active,
             expiration_in_sse=expiration_in_sse,
@@ -170,12 +182,6 @@ class SimpleKeyStore:
             login=login,
         )
 
-        # Add the WHERE clause
-        query += where_clause
-        # print(f"get_matching_key_records: {query=}")
-
-        # Execute the query with parameterized values
-        cursor = self.cx.execute(query, tuple(values))
         matching_records = self.record_dicts_from_select_star_results(cursor.fetchall())
         # print(f"{matching_records=}")
 
@@ -196,7 +202,8 @@ class SimpleKeyStore:
         # Construct the base query
         query = f"DELETE FROM {self.KEYSTORE_TABLE_NAME}"
 
-        where_clause, values = self._build_where_clause_and_values(
+        cursor = self.run_query_with_where_clause(
+            query=query,
             name=name,
             active=active,
             expiration_in_sse=expiration_in_sse,
@@ -205,15 +212,9 @@ class SimpleKeyStore:
             login=login,
         )
 
-        # Add the WHERE clause
-        query += where_clause
-        # print(f"get_matching_key_records: {query=}")
-
-        # Execute the query with parameterized values
-        cursor = self.cx.execute(query, tuple(values))
         return cursor.rowcount
 
-    def _build_where_clause_and_values(self, **kwargs) -> Tuple[str, List[Any]]:
+    def run_query_with_where_clause(self, query: str, **kwargs) -> sqlite3.Cursor:
         """Build the WHERE clause for a keystore query based on the provided key-value pairs."""
         conditions = []
         values: List[Any] = []
@@ -229,6 +230,43 @@ class SimpleKeyStore:
         if "active" in kwargs and kwargs["active"] is not None:
             conditions.append("active = 1" if kwargs["active"] else "active = 0")
 
-        # Join all conditions with 'AND'
-        where_clause = " WHERE " + " AND ".join(conditions)
-        return where_clause, values
+        cursor = None
+        if len(conditions):
+            # Join all conditions with 'AND'
+            where_clause = " WHERE " + " AND ".join(conditions)
+
+            # Execute the query with parameterized values
+            cursor = self.cx.execute(query + where_clause, tuple(values))
+        else:
+            # Just run the query as-is
+            cursor = self.cx.execute(query)
+
+        return cursor
+
+    def tabulate_records_matching(
+        self,
+        name: str = None,
+        active: bool = None,
+        expiration_in_sse: int = None,
+        batch: str = None,
+        source: str = None,
+        login: str = None,
+    ) -> str:
+        # Get the matching records
+        data = self.get_matching_key_records(
+            name=name,
+            active=active,
+            expiration_in_sse=expiration_in_sse,
+            batch=batch,
+            source=source,
+            login=login,
+        )
+
+        # Extracting the keys to use as headers
+        headers = data[0].keys() if data else []
+
+        # Creating the table using the tabulate module
+        table = [[str(item.get(header, ""))[:25] for header in headers] for item in data]
+
+        # Displaying the table with keys as headers
+        print(tabulate(table, headers=headers, tablefmt="grid"))
