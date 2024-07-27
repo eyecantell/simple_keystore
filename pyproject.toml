@@ -1,0 +1,28 @@
+[project]
+name = "simple_keystore"
+version = "0.1.0"
+description = "\"A simple encrypted key storage\""
+authors = [
+    {name = "Paul", email = "paul@nowfree.org"},
+]
+dependencies = ["cryptography>=43.0.0"]
+requires-python = ">=3.8"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.dev-dependencies]
+dev = []
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[project.urls]
+Repository = "https://github.com/eyecantell/simple_keystore"
+Issues = "https://github.com/eyecantell/simple_keystore/issues"
