@@ -159,14 +159,19 @@ def test_tabulate_records_matching():
     # Add records in two batches:
     # Batch one has active and inactive keys: active = True/False, batch='one'
     # Batch two has active and inactive keys: active = True/False, batch='two'
-    for i in range(4):
-        for active in [True, False]:
-            for batch in ["one", "two"]:
-                ks.add_key(name=my_key_name, unencrypted_key=my_key_value, active=active, batch=batch)
+    new_ids = []
+    for active in [True, False]:
+        for batch in ["one", "two"]:
+            new_ids.append(ks.add_key(name=my_key_name, unencrypted_key=my_key_value, active=active, batch=batch))
 
     # Tabulate the records
-    tabulated = ks.tabulate_records_matching()
-    print(tabulated)
+    tabulated = ks.tabulate_records_matching(name=my_key_name)
+    #print(tabulated)
+    for header in ["id", "name", "expiration_in_sse", "active", "batch", "source", "login", "encrypted_key", "key"]:
+        assert header in tabulated, f"Expected {header=} in tabulated, but did not find it: \n{tabulated}"
+
+    for id in new_ids:
+        assert str(id) in tabulated, f"Expected {id=} in tabulated, but did not find it: \n{tabulated}"
 
 
 if __name__ == "__main__":

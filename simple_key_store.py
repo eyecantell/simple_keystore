@@ -1,6 +1,6 @@
 from cryptography.fernet import Fernet
 from tabulate import tabulate
-from typing import Any, Dict, List, Optional, Tuple, TypedDict
+from typing import Any, Dict, List
 import os
 import sqlite3
 
@@ -269,4 +269,4 @@ class SimpleKeyStore:
         table = [[str(item.get(header, ""))[:25] for header in headers] for item in data]
 
         # Displaying the table with keys as headers
-        print(tabulate(table, headers=headers, tablefmt="grid"))
+        return tabulate(table, headers=headers, tablefmt="grid")
