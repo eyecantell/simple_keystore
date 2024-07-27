@@ -1,0 +1,27 @@
+{
+    "name": "simple_keystore development environment",
+    "postCreateCommand": "pdm add --dev -e .",
+    
+    "build": {
+      "dockerfile": "Dockerfile",
+      "context": ".."
+    },
+    
+    "mounts": [
+      {
+        "type": "bind",
+        "source": "${localEnv:HOME}/.netrc",
+        "target": "/home/developer/.netrc"
+      }
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-azuretools.vscode-docker",
+                "ms-python.python",
+                "github.vscode-github-actions",
+                "be5invis.toml"
+            ]
+        }
+    }
+  }
