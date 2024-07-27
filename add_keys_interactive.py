@@ -3,12 +3,20 @@ from simple_key_store import SimpleKeyStore
 from datetime import datetime, timedelta
 
 
-def add_key_interactive(ks: SimpleKeyStore, defaults: dict = {}):
+def add_keys_interactive(ks: SimpleKeyStore, defaults: dict = {}):
+    add_another = False
+    while add_another:
+        new_id = add_single_key_interactive(ks, defaults)
+        new_record = ks.get_key_record_by_id(new_id)
+        add_another = True if "y" in str(get_input("Add another?", default="No")).lower() else False
+
+
+def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}):
     """Prompt user for entries to create a single key record"""
     required_fields = ["name"]
     answer = {}
 
-    for field in ks.keystore_columns():
+    for field in ks.keystore_columns() + ["unencrypted_key"]:
         if field in ["active", "encrypted_key", "expiration_in_sse", "id"]:
             continue
         answer_from_user = get_input(
@@ -19,8 +27,19 @@ def add_key_interactive(ks: SimpleKeyStore, defaults: dict = {}):
         answer[field] = answer_from_user
 
     answer["active"] = True if "y" in str(get_input("Is the key active?", default="Yes")).lower() else False
-    answer["expiration_in_sse"] = get_expiration_seconds_from_input(defaults.get('expiration_in_sse'))
+    answer["expiration_in_sse"] = get_expiration_seconds_from_input(defaults.get("expiration_in_sse"))
     print(f"{answer=}")
+
+    new_id = ks.add_key(
+        name=answer["name"],
+        unencrypted_key=answer["unencrypted_key"],
+        active=answer["active"],
+        expiration_in_sse=answer["expiration_in_sse"],
+        batch=answer["batch"],
+        source=answer["source"],
+        login=answer["login"],
+    )
+    return new_id
 
 
 # Now you can use these values to insert a new record into the database
@@ -39,9 +58,12 @@ def get_input(question: str, required: bool = False, default: Any = None) -> Any
 
 
 def get_expiration_seconds_from_input(default) -> int:
-    expiration_input = get_input("Enter the expiration time in number of days or a specific date (YYYY-MM-DD): ", default=default)
+    expiration_input = get_input(
+        "Enter the expiration time in number of days or a specific date (YYYY-MM-DD): ", default=default
+    )
 
-    if not expiration_input: return None
+    if not expiration_input:
+        return None
     try:
         # Attempt to parse input as an integer (days)
         expiration_days = int(expiration_input)
@@ -54,7 +76,7 @@ def get_expiration_seconds_from_input(default) -> int:
 
     return expiration_seconds
 
+
 if __name__ == "__main__":
     ks = SimpleKeyStore("interactive_test")
-    add_key_interactive(ks)
-
+    add_single_key_interactive(ks)
