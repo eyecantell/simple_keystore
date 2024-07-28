@@ -85,9 +85,10 @@ class SimpleKeyStore:
         login: str = None,
     ) -> int:
         """Add a new key record. Returns the newly created id"""
+
         self.create_keystore_table_if_dne()
         active_value = 1 if active else 0
-        encrypted_key = self.cipher.encrypt(unencrypted_key.encode())
+        encrypted_key = self.cipher.encrypt(unencrypted_key.encode()) if unencrypted_key else None
         cursor = self.cx.execute(
             f"INSERT INTO {self.KEYSTORE_TABLE_NAME} \
                         (name, expiration_in_sse, active, batch, source, login, encrypted_key) VALUES (?,?,?,?,?,?,?)",
@@ -243,13 +244,24 @@ class SimpleKeyStore:
 
         return cursor
 
-    def tabulate_records(self, records : List) -> str:
-
+    def tabulate_records(self, records: List) -> str:
         # Extracting the keys to use as headers
         headers = records[0].keys() if records else []
 
         # Creating the table using the tabulate module
-        table = [[str(item.get(header, ""))[:25] for header in headers] for item in records]
+
+        table = []  #
+        for rec in records:
+            row = []
+            for header in headers:
+                if "key" in header:
+                    # Limit keys to the first few characters
+                    value = str(rec.get(header, ""))[:18] + "..."
+                else:
+                    # Limit other fields to 30 chars
+                    value = str(rec.get(header, ""))[:30]
+                row.append(value)
+            table.append(row)
 
         # Displaying the table with keys as headers
         return tabulate(table, headers=headers)
