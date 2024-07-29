@@ -175,10 +175,78 @@ def test_tabulate_records_matching():
         assert str(id) in tabulated, f"Expected {id=} in tabulated, but did not find it: \n{tabulated}"
 
 
+def test_get_matching_key_records_no_args():
+    """If no args are given to get_matching_key_records, we expect to get all records"""
+    # Setup
+    my_key_name = "test_get_matching_key_records_no_args"
+
+    my_key_value = "123abc_" + my_key_name
+
+    # Add some records
+    num_records_to_create = 5
+    for i in range(num_records_to_create):
+        ks.add_key(name=my_key_name, unencrypted_key=my_key_value, batch=str(i))
+
+    matching_records = ks.get_matching_key_records()
+    num_records_in_db = ks.number_of_records()
+
+    assert (
+        len(matching_records) >= num_records_to_create
+    ), f"Expected at least {num_records_to_create} matching records, but got {len(matching_records)}"
+    assert (
+        num_records_in_db >= num_records_to_create
+    ), f"Expected at least {num_records_to_create} records in db, but got {num_records_in_db}"
+    assert num_records_in_db == len(
+        matching_records
+    ), f"Expected same number of records, but got {num_records_in_db=} and {len(matching_records)=}"
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
+
+def test_get_key_record():
+    """Get a specific key by giving hte unencrypted key value"""
+    # Setup
+    my_key_name = "test_get_key_record"
+
+    my_key_value = "123abc_" + my_key_name
+
+    # Add the key
+    new_id = ks.add_key(name=my_key_name, unencrypted_key=my_key_value)
+    assert new_id, "Failed to add key"
+
+    # Get the record from the db
+    key_record = ks.get_key_record(unencrypted_key=my_key_value)
+    #print(f"{key_record=}")
+
+    assert key_record, "Failed to retrieve added key"
+    assert key_record.get("key") == my_key_value, f"Expected {my_key_value=}, but got {key_record.get('key')}"
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
+
+def test_encrypt_and_decrypt():
+    keys_to_test = [
+        'gAAAAABmp7N54OH60IYC5mrY1nRowyHaw39d3C6zY',
+        '123abc_my_test',
+        '1',
+        'a',
+    ]
+
+    # Encrypt and decrypt each key
+    for unencrypted_key in keys_to_test:
+        encrypted_key = ks.encrypt_key(unencrypted_key)
+        decrypted_key = ks.decrypt_key(encrypted_key)
+        assert unencrypted_key == decrypted_key, f"Expected {unencrypted_key} but got {decrypted_key}"
+
+
 if __name__ == "__main__":
+    test_encrypt_and_decrypt()
     test_key_is_added_encrypted()
     test_add_and_retrieve_named_key_without_other_data()
     test_add_and_retrieve_named_key_with_all_fields()
     test_delete_matching_key_records()
     test_get_key_record_by_id()
     test_tabulate_records_matching()
+    test_get_matching_key_records_no_args()
+    test_get_key_record()
+    
