@@ -181,7 +181,7 @@ class SimpleKeyStore:
     def delete_key_record(self, unencrypted_key: str) -> int:
         """Delete any records with the given key value. Returns number of records deleted"""
         key_record = self.get_key_record(unencrypted_key)
-        cursor = self.cx.execute(f"DELETE FROM {self.KEYSTORE_TABLE_NAME} WHERE id=?", (key_record['id'],))
+        cursor = self.cx.execute(f"DELETE FROM {self.KEYSTORE_TABLE_NAME} WHERE id=?", (key_record["id"],))
         # print(f"Deleted {cursor.rowcount} records with {encrypted_key=}")
         return cursor.rowcount
 
@@ -290,7 +290,7 @@ class SimpleKeyStore:
         return cursor
 
     def tabulate_records(
-        self, records: List[Dict], headers: List = None, sort_order: List = None, show_full_key: bool = False
+        self, records: List[Dict], headers: List = None, sort_order: List = None, show_full_key: bool = False, show_index : bool = True
     ) -> str:
         """Return a string of tabulated records. If headers is blank will use all keys. If given will sort by keys listed in sort_order."""
         # Extracting the keys to use as headers
@@ -315,10 +315,12 @@ class SimpleKeyStore:
                 if "key" in header:
                     # Limit keys to the first and last few characters
                     key_value = str(rec.get(header))
-                    if header == 'key' and show_full_key:
+                    if header == "key" and show_full_key:
                         value = key_value
-                    else:
+                    elif len(value) > 20:
                         value = key_value[:8] + "..." + key_value[-8:]
+                    else:
+                        value = key_value
                 else:
                     # Limit other fields to 30 chars
                     value = str(rec.get(header, ""))[:30]
@@ -326,7 +328,7 @@ class SimpleKeyStore:
             table.append(row)
 
         # Displaying the table with keys as headers
-        return tabulate(table, headers=headers)
+        return tabulate(table, headers=headers, showindex=show_index)
 
     def number_of_records(self) -> int:
         """Return the number of key records currently in the db"""
@@ -368,6 +370,7 @@ class SimpleKeyStore:
                     headers=sort_order + ["expired", "usable", "key"],
                     sort_order=sort_order,
                     show_full_key=True,
+                    show_index= True,
                 )
             )
         return key_records
@@ -375,53 +378,20 @@ class SimpleKeyStore:
     def usability_counts_report(
         self, key_name: str = None, print_records: bool = False, print_counts=False
     ) -> List[Dict]:
+        
         usability_records = self.records_for_usability_report(key_name, print_records)
 
-        # Count the number of usable records for each set, where avset is combo of name, source, login, batch
-        usable_count_by_qualified_name = {}
-        unusable_count_by_qualified_name = {}
-        usable_count = 0
-        unusable_count = 0
-        qual_fields = ["name", "source", "login", "batch"]
-        delim = "+|+"
-        for record in usability_records:
-            # print(f"{record=}")
-
-            qualified_name = delim.join(str(record[field]) for field in qual_fields)
-            # print(f"{qualified_name=}")
-            if qualified_name not in usable_count_by_qualified_name:
-                usable_count_by_qualified_name[qualified_name] = 0
-            if qualified_name not in unusable_count_by_qualified_name:
-                unusable_count_by_qualified_name[qualified_name] = 0
-
-            if record["usable"]:
-                usable_count_by_qualified_name[qualified_name] += 1
-                usable_count += 1
-            else:
-                unusable_count_by_qualified_name[qualified_name] += 1
-                unusable_count += 1
-
-        # Create records with the counts that we can tabulate
-        records_for_count_display = []
-        for qualified_name in usable_count_by_qualified_name.keys():
-            # print(f"{qualified_name}: usable={usable_count_by_qualified_name[qualified_name]}, unusable={unusable_count_by_qualified_name[qualified_name]}")
-            field_values = str(qualified_name).split(delim)
-            count_record = {}
-            i = 0
-            for field in qual_fields:
-                count_record[field] = field_values[i]
-                i += 1
-            count_record["usable"] = usable_count_by_qualified_name[qualified_name]
-            count_record["unusable"] = unusable_count_by_qualified_name[qualified_name]
-            records_for_count_display.append(count_record)
+        # Count the number of usable records for each set, where a set is combo of name, source, login, batch
+        set_records = self.get_sets_of_records_with_counts(usability_records)
+        usable_count = sum(1 for record in set_records if record.get('usable'))
 
         if print_counts:
             print(
-                f"Usability counts ({len(usability_records)} records total, {usable_count} usable, {unusable_count} not)"
+                f"Usability counts ({len(usability_records)} records total, {usable_count} usable)"
             )
-            print(self.tabulate_records(records_for_count_display))
+            print(self.tabulate_records(set_records, show_index=True))
 
-        return records_for_count_display
+        return set_records
 
     def update_key(
         self,
@@ -481,7 +451,54 @@ class SimpleKeyStore:
 
         return number_of_records_updated
 
-    def get_next_active_key(
+    def get_sets_of_records_with_counts(self, records: List[Dict]):
+        """Return a list of the record sets with their counts. Each set of records share name, source, login and batch."""
+
+        set_defining_fields = ["name", "source", "login", "batch"]
+        count_fields = ["total", "active", "expired", "usable"]
+
+        count_by_set_name = {}
+        delim = "+|+"
+        for record in records:
+            set_name = delim.join(str(record.get(field)) for field in set_defining_fields)
+            if set_name not in count_by_set_name:
+                count_by_set_name[set_name] = {}
+                for cf in count_fields:
+                    count_by_set_name[set_name][cf] = 0
+
+            count_by_set_name[set_name]["total"] += 1
+            for cf in count_fields:
+                if cf == "total":
+                    # Already counted total above (and there likely is no record value for it)
+                    continue
+                # Count each of active, expired, usable
+                count_by_set_name[set_name][cf] += 1 if record[cf] else 0
+
+        #print(f"{count_by_set_name=}")
+
+        # Build a "set record" that will have each of the set defining fields and the counts
+        set_records_list = []
+        for set_name in count_by_set_name.keys():
+            # Prepare a new set record
+            set_record = {}
+            # Get the set defining field values from the set_name
+            field_values = str(set_name).split(delim)
+            i = 0
+            for field in set_defining_fields:
+                set_record[field] = field_values[i]
+                i += 1
+
+            # Add the counts
+            for cf in count_fields:
+                set_record[cf] = count_by_set_name[set_name][cf]
+
+            # Save our set record
+            set_records_list.append(set_record)
+
+        #print(f"{set_records_list=}")
+        return set_records_list
+
+    def get_next_usable_key(
         self,
         name: str = None,
         batch: str = None,
@@ -490,8 +507,19 @@ class SimpleKeyStore:
     ):
         """Return the next key to use that matches the given fields. Will look for:
         1. Soonest expiring
-        2. Smallest batch of active keys"""
+        2. Smallest set of usable keys, where set is combo of name, source, login, batch"""
         matching_records = self.get_matching_key_records(
             name=name,
             active=True,
+            batch=batch,
+            source=source,
+            login=login,
         )
+
+        # Get the usable records
+        usable_records = []
+        for record in matching_records:
+            if record["usable"]:
+                usable_records.append(record)
+
+        set_records = self.get_sets_of_records_with_counts(usable_records)

@@ -318,7 +318,7 @@ def test_usability_report():
                             )
 
     # Get the report and check the expected values
-    usability_records = ks.usability_counts_report(key_name=my_key_name, print_records=False, print_counts=False)
+    usability_records = ks.usability_counts_report(key_name=my_key_name, print_records=True, print_counts=True)
 
     assert len(usability_records) == 12, f"Expected 12 records, but got {len(usability_records)}"
 
@@ -353,8 +353,11 @@ def test_usability_report():
             usability_records[i].get("usable") == 3
         ), f"Expected record {i} usable count to be 3, but got {usability_records[i].get('usable')}"
         assert (
-            usability_records[i].get("unusable") == 9
-        ), f"Expected record {i} unusable count to be 9, but got {usability_records[i].get('unusable')}"
+            usability_records[i].get("active") == 6
+        ), f"Expected record {i} active count to be 6, but got {usability_records[i].get('active')}"
+        assert (
+            usability_records[i].get("expired") == 6
+        ), f"Expected record {i} expired count to be 6, but got {usability_records[i].get('expired')}"
 
     # Clean up
     ks.delete_records_with_name(my_key_name)
@@ -504,12 +507,13 @@ def test_mark_key_inactive():
     # Clean up
     ks.delete_records_with_name(my_key_name)
 
+
 def test_delete_key_record():
-     # Setup
+    # Setup
     my_key_name = "test_delete_key_record"
     my_key_value = "123abc_" + my_key_name
     ks.delete_records_with_name(my_key_name)
-    
+
     # Add a key
     record_id = ks.add_key(
         name=my_key_name,
@@ -519,13 +523,35 @@ def test_delete_key_record():
     # Delete the key
     ks.delete_key_record(my_key_value)
 
-    assert ks.get_key_record_by_id(record_id) is None, f"Expected record to be deleted, but got {ks.get_key_record_by_id(record_id)}"
+    assert (
+        ks.get_key_record_by_id(record_id) is None
+    ), f"Expected record to be deleted, but got {ks.get_key_record_by_id(record_id)}"
 
     # Clean up
     ks.delete_records_with_name(my_key_name)
 
+
+def test_get_next_usable_key():
+    # Setup
+    my_key_name = "test_get_next_usable_key"
+    my_key_value = "123abc_" + my_key_name
+    ks.delete_records_with_name(my_key_name)
+
+    # Add a key
+    record_id = ks.add_key(
+        name=my_key_name,
+        unencrypted_key=my_key_value,
+    )
+
+    # Get next usable key
+    ks.get_next_usable_key(name=my_key_name)
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
+
+
 if __name__ == "__main__":
-    test_encrypt_and_decrypt()
+    """test_encrypt_and_decrypt()
     test_key_is_added_encrypted()
     test_add_and_retrieve_named_key_without_other_data()
     test_add_and_retrieve_named_key_with_all_fields()
@@ -538,4 +564,5 @@ if __name__ == "__main__":
     test_usability_report()
     test_update_record_individual_fields()
     test_update_record_all_fields()
-    test_mark_key_inactive()
+    test_mark_key_inactive()"""
+    test_get_next_usable_key()

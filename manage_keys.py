@@ -7,7 +7,7 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
     """Offer CLI interactive menu to manage keys"""
     new_records_list = []
     use_last_answer_as_default = False if defaults else True
-    #print(f"{use_last_answer_as_default=}")
+    # print(f"{use_last_answer_as_default=}")
 
     while True:
         all_records = ks.get_matching_key_records()
@@ -20,7 +20,7 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
             "[M] Mark key inactive, and get next available.",
             f"[S] List the {len(new_records_list)} keys created this session.",
             "[U] Show usability counts report",
-            '[V] TODO Delete unusable (inactive or expired) keys',
+            "[V] TODO Delete unusable (inactive or expired) keys",
             "[X] Exit",
         ]
 
@@ -82,7 +82,7 @@ def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}) -> Dict:
 
     answer["active"] = True if "y" in str(get_input("Is the key active?", default="Yes")).lower() else False
     answer["expiration_in_sse"] = get_expiration_seconds_from_input(defaults.get("expiration_in_sse"))
-    #print(f"{answer=}")
+    # print(f"{answer=}")
 
     new_id = ks.add_key(
         name=answer["name"],
