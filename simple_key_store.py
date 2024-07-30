@@ -130,6 +130,13 @@ class SimpleKeyStore:
         record_data["expiration_date"] = None
         if record_data.get("expiration_in_sse"):
             record_data["expiration_date"] = datetime.fromtimestamp(int(record_data.get("expiration_in_sse")))
+        today = datetime.today()
+
+        # Add whether the record is expired
+        record_data["expired"] = False if record_data.get("expiration_date") is None else (record_data["expiration_date"] < today)
+
+        # Add whether the record is usable (active and not expired)
+        record_data["usable"] = record_data["active"] and not record_data["expired"]
 
         # Include the unencrypted key
         if include_unencrypted_key:
@@ -195,8 +202,10 @@ class SimpleKeyStore:
         batch: str = None,
         source: str = None,
         login: str = None,
+        sort_order: List = None,
     ) -> List[Dict]:
-        """Retrieve the keystore records matching the given parameters. Any parameters that are None are ignored."""
+        """Retrieve the keystore records matching the given parameters. Any parameters that are None are ignored.
+        Sort order can be specified using any/all of the columns including calculated ones (expired, usable, expiration_date)"""
 
         # Construct the base query
         query = f"SELECT * FROM {self.KEYSTORE_TABLE_NAME}"
@@ -213,6 +222,9 @@ class SimpleKeyStore:
 
         matching_records = self._record_dicts_from_select_star_results(cursor.fetchall())
         # print(f"{matching_records=}")
+
+        if sort_order:
+            matching_records.sort(key=lambda x: tuple(x.get(field) for field in sort_order))
 
         return matching_records
 
@@ -340,15 +352,7 @@ class SimpleKeyStore:
     ) -> List[Dict]:
         """Get list of sorted key records with the given name. Gets ALL if no name given.
         Will print a tabulated list of the records if print_records is True"""
-        key_records = self.get_matching_key_records(name=key_name)
-
-        # Calculate and add whether each record is expired and/or usable for each record
-        today = datetime.today()
-        for record in key_records:
-            record["expired"] = False if record.get("expiration_date") is None else (record["expiration_date"] < today)
-            record["usable"] = record["active"] and not record["expired"]
-
-        key_records.sort(key=lambda x: tuple(x.get(field) for field in sort_order))
+        key_records = self.get_matching_key_records(name=key_name, sort_order = sort_order)
 
         if print_records:
             print(
@@ -411,7 +415,7 @@ class SimpleKeyStore:
 
     def update_key(
         self,
-        id_to_update : int,
+        id_to_update: int,
         name: str = None,
         active: bool = None,
         expiration_in_sse: int = None,
@@ -423,7 +427,7 @@ class SimpleKeyStore:
         params = {}
         set_clause = []
 
-        if type(id_to_update).__name__ != 'int':
+        if type(id_to_update).__name__ != "int":
             raise ValueError(f"Expected id_to_update to be an integer, but got {type(id_to_update)}={id_to_update}")
 
         if name is not None:
@@ -463,6 +467,18 @@ class SimpleKeyStore:
     def mark_key_inactive(self, unencrypted_key: str) -> int:
         """Mark the given key inactive."""
         record = self.get_key_record(unencrypted_key)
-        number_of_records_updated = self.update_key(record['id'], active=False)
+        number_of_records_updated = self.update_key(record["id"], active=False)
 
         return number_of_records_updated
+
+    def get_next_active_key(
+        self,
+        name: str = None,
+        batch: str = None,
+        source: str = None,
+        login: str = None,
+    ):
+        """Return the next key to use that matches the given fields. Will look for:
+        1. Soonest expiring
+        2. Smallest batch of active keys"""
+        matching_records = self.get_matching_key_records(name=name, active=True, )
