@@ -7,19 +7,20 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
     """Offer CLI interactive menu to manage keys"""
     new_records_list = []
     use_last_answer_as_default = False if defaults else True
-    print(f"{use_last_answer_as_default=}")
+    #print(f"{use_last_answer_as_default=}")
 
     while True:
         all_records = ks.get_matching_key_records()
         print(f"Currently {len(all_records)} in {ks.name}")
 
         menu_items = [
-            f"[A] List all {len(all_records)} keys in {ks.name}",
+            f"[A] Add new key to {ks.name}",
             "[D] Delete a key",
+            f"[L] List all {len(all_records)} keys in {ks.name}",
             "[M] Mark key inactive, and get next available.",
-            f"[N] Add new key to {ks.name}",
             f"[S] List the {len(new_records_list)} keys created this session.",
-            "[U]Show usability report",
+            "[U] Show usability counts report",
+            '[V] TODO Delete unusable (inactive or expired) keys',
             "[X] Exit",
         ]
 
@@ -27,16 +28,7 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
         choice = str(get_input(f"{menu_string}\n--\nWhat would you like to do?", default="X")).upper()
 
         if choice == "A":
-            # Show all keys in the db
-            print(f"All records in {ks.name}")
-            ks.records_for_usability_report(print_records=True)
-
-        elif choice == "D":
-            key_to_delete = get_input("Enter key that should be deleted")
-            number_of_keys_deleted = ks.delete_key_record(unencrypted_key=key_to_delete)
-            print(f"{number_of_keys_deleted} keys deleted.")
-
-        elif choice == "N":
+            # Add a new key
             new_record = add_single_key_interactive(ks, defaults)
 
             if use_last_answer_as_default:
@@ -49,6 +41,17 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
             # Add the new record to our list of records and show the list of created records
             new_records_list.append(new_record)
             print(ks.tabulate_records(new_records_list))
+
+        elif choice == "D":
+            key_to_delete = get_input("Enter key that should be deleted")
+            print(f"Will delete {key_to_delete=}")
+            number_of_keys_deleted = ks.delete_key_record(unencrypted_key=key_to_delete)
+            print(f"{number_of_keys_deleted} keys deleted.")
+
+        elif choice == "L":
+            # List all keys in the db
+            print(f"All records in {ks.name}")
+            ks.records_for_usability_report(print_records=True)
 
         elif choice == "S":
             # Show keys created this session
@@ -79,7 +82,7 @@ def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}) -> Dict:
 
     answer["active"] = True if "y" in str(get_input("Is the key active?", default="Yes")).lower() else False
     answer["expiration_in_sse"] = get_expiration_seconds_from_input(defaults.get("expiration_in_sse"))
-    print(f"{answer=}")
+    #print(f"{answer=}")
 
     new_id = ks.add_key(
         name=answer["name"],

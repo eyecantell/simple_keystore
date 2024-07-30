@@ -504,6 +504,25 @@ def test_mark_key_inactive():
     # Clean up
     ks.delete_records_with_name(my_key_name)
 
+def test_delete_key_record():
+     # Setup
+    my_key_name = "test_delete_key_record"
+    my_key_value = "123abc_" + my_key_name
+    ks.delete_records_with_name(my_key_name)
+    
+    # Add a key
+    record_id = ks.add_key(
+        name=my_key_name,
+        unencrypted_key=my_key_value,
+    )
+
+    # Delete the key
+    ks.delete_key_record(my_key_value)
+
+    assert ks.get_key_record_by_id(record_id) is None, f"Expected record to be deleted, but got {ks.get_key_record_by_id(record_id)}"
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
 
 if __name__ == "__main__":
     test_encrypt_and_decrypt()

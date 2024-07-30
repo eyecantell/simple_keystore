@@ -116,7 +116,8 @@ class SimpleKeyStore:
         return records_list
 
     def _get_dict_from_record_tuple(self, record, include_unencrypted_key=True) -> dict:
-        """Presuming a SELECT * was used, this returns a dict of the given record, and includes the unencrypted key."""
+        """Presuming a SELECT * was used, this returns a dict of the given record, and includes the unencrypted key.
+        Also includes calculated fields: expiration_date, expired, and usable (active and not expired)."""
         record_data = {}
         i = 0
         for c in self.keystore_columns():
@@ -133,7 +134,9 @@ class SimpleKeyStore:
         today = datetime.today()
 
         # Add whether the record is expired
-        record_data["expired"] = False if record_data.get("expiration_date") is None else (record_data["expiration_date"] < today)
+        record_data["expired"] = (
+            False if record_data.get("expiration_date") is None else (record_data["expiration_date"] < today)
+        )
 
         # Add whether the record is usable (active and not expired)
         record_data["usable"] = record_data["active"] and not record_data["expired"]
@@ -177,8 +180,8 @@ class SimpleKeyStore:
 
     def delete_key_record(self, unencrypted_key: str) -> int:
         """Delete any records with the given key value. Returns number of records deleted"""
-        encrypted_key = self.encrypt_key(unencrypted_key)
-        cursor = self.cx.execute(f"DELETE FROM {self.KEYSTORE_TABLE_NAME} WHERE encrypted_key=?", (encrypted_key,))
+        key_record = self.get_key_record(unencrypted_key)
+        cursor = self.cx.execute(f"DELETE FROM {self.KEYSTORE_TABLE_NAME} WHERE id=?", (key_record['id'],))
         # print(f"Deleted {cursor.rowcount} records with {encrypted_key=}")
         return cursor.rowcount
 
@@ -286,7 +289,9 @@ class SimpleKeyStore:
 
         return cursor
 
-    def tabulate_records(self, records: List[Dict], headers: List = None, sort_order: List = None) -> str:
+    def tabulate_records(
+        self, records: List[Dict], headers: List = None, sort_order: List = None, show_full_key: bool = False
+    ) -> str:
         """Return a string of tabulated records. If headers is blank will use all keys. If given will sort by keys listed in sort_order."""
         # Extracting the keys to use as headers
 
@@ -310,7 +315,9 @@ class SimpleKeyStore:
                 if "key" in header:
                     # Limit keys to the first and last few characters
                     key_value = str(rec.get(header))
-                    if key_value:
+                    if header == 'key' and show_full_key:
+                        value = key_value
+                    else:
                         value = key_value[:8] + "..." + key_value[-8:]
                 else:
                     # Limit other fields to 30 chars
@@ -352,12 +359,15 @@ class SimpleKeyStore:
     ) -> List[Dict]:
         """Get list of sorted key records with the given name. Gets ALL if no name given.
         Will print a tabulated list of the records if print_records is True"""
-        key_records = self.get_matching_key_records(name=key_name, sort_order = sort_order)
+        key_records = self.get_matching_key_records(name=key_name, sort_order=sort_order)
 
         if print_records:
             print(
                 self.tabulate_records(
-                    key_records, headers=sort_order + ["expired", "usable", "key"], sort_order=sort_order
+                    key_records,
+                    headers=sort_order + ["expired", "usable", "key"],
+                    sort_order=sort_order,
+                    show_full_key=True,
                 )
             )
         return key_records
@@ -481,4 +491,7 @@ class SimpleKeyStore:
         """Return the next key to use that matches the given fields. Will look for:
         1. Soonest expiring
         2. Smallest batch of active keys"""
-        matching_records = self.get_matching_key_records(name=name, active=True, )
+        matching_records = self.get_matching_key_records(
+            name=name,
+            active=True,
+        )
