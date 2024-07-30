@@ -345,13 +345,16 @@ def test_usability_report():
         ), f"Expected record {i+2} login to be 'login2', but got {usability_records[i+2].get('login')}"
 
     for i in range(12):
-        batch = "two" if i%2 else "one"
+        batch = "two" if i % 2 else "one"
         assert (
             usability_records[i].get("batch") == batch
         ), f"Expected record {i} batch to be 'login1', but got {usability_records[i].get('batch')}"
-        assert usability_records[i].get("usable") == 3, f"Expected record {i} usable count to be 3, but got {usability_records[i].get('usable')}"
-        assert usability_records[i].get("unusable") == 9, f"Expected record {i} unusable count to be 9, but got {usability_records[i].get('unusable')}"
-
+        assert (
+            usability_records[i].get("usable") == 3
+        ), f"Expected record {i} usable count to be 3, but got {usability_records[i].get('usable')}"
+        assert (
+            usability_records[i].get("unusable") == 9
+        ), f"Expected record {i} unusable count to be 9, but got {usability_records[i].get('unusable')}"
 
     # Clean up
     ks.delete_records_with_name(my_key_name)
