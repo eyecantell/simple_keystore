@@ -56,7 +56,7 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
 
         elif choice == "X":
             break
-        
+
         elif choice == "U":
             ks.usability_counts_report(print_counts=True)
 

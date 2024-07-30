@@ -350,7 +350,11 @@ class SimpleKeyStore:
         key_records.sort(key=lambda x: tuple(x.get(field) for field in sort_order))
 
         if print_records:
-            print(self.tabulate_records(key_records, headers=sort_order+['expired', 'usable', 'key'], sort_order=sort_order))
+            print(
+                self.tabulate_records(
+                    key_records, headers=sort_order + ["expired", "usable", "key"], sort_order=sort_order
+                )
+            )
         return key_records
 
     def usability_counts_report(
