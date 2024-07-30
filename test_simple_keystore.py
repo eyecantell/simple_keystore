@@ -168,7 +168,7 @@ def test_tabulate_records_matching():
     # Tabulate the records
     records = ks.get_matching_key_records(name=my_key_name)
     tabulated = ks.tabulate_records(records)
-    #print(tabulated)
+    # print(tabulated)
     for header in ["id", "name", "expiration_in_sse", "active", "batch", "source", "login", "encrypted_key", "key"]:
         assert header in tabulated, f"Expected {header=} in tabulated, but did not find it: \n{tabulated}"
 
@@ -409,6 +409,7 @@ def test_update_record_individual_fields():
     ks.delete_records_with_name(my_key_name)
     ks.delete_records_with_name(my_key_name + "_updated")
 
+
 def test_update_record_all_fields():
     """Update all fields at once. Tests update_record()"""
 
@@ -459,6 +460,51 @@ def test_update_record_all_fields():
     ks.delete_records_with_name(my_key_name)
     ks.delete_records_with_name(my_key_name + "_updated")
 
+
+def test_mark_key_inactive():
+    """Mark key inactive, make sure only the 'active' field changed. Tests mark_key_inactive()"""
+
+    # Setup
+    my_key_name = "test_mark_key_inactive"
+    my_key_value = "123abc_" + my_key_name
+    ks.delete_records_with_name(my_key_name)
+    key_info = {
+        "name": my_key_name,
+        "key": my_key_value,
+        "active": True,
+        "batch": "mybatch",
+        "expiration_in_sse": 123456,
+        "login": "mylogin",
+        "source": "mysource",
+    }
+
+    # Add the key
+    record_id = ks.add_key(
+        name=key_info["name"],
+        unencrypted_key=key_info["key"],
+        active=key_info["active"],
+        batch=key_info["batch"],
+        expiration_in_sse=key_info["expiration_in_sse"],
+        login=key_info["login"],
+        source=key_info["source"],
+    )
+
+    # Mark the key inactive
+    ks.mark_key_inactive(key_info["key"])
+    retrieved_record = ks.get_key_record_by_id(record_id)
+
+    assert retrieved_record["active"] is False, f"Expected acitve to be false but got {retrieved_record['active']}"
+    for field, value in key_info.items():
+        if field == "active":
+            continue
+        assert (
+            retrieved_record.get(field) == value
+        ), f"Expected {field} = '{value}' but got {retrieved_record.get(field)}"
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
+
+
 if __name__ == "__main__":
     test_encrypt_and_decrypt()
     test_key_is_added_encrypted()
@@ -473,3 +519,4 @@ if __name__ == "__main__":
     test_usability_report()
     test_update_record_individual_fields()
     test_update_record_all_fields()
+    test_mark_key_inactive()

@@ -269,7 +269,7 @@ class SimpleKeyStore:
             cursor = self.cx.execute(query + where_clause, tuple(values))
         else:
             # Just run the query as-is
-            #print(f"Executing {query=}")
+            # print(f"Executing {query=}")
             cursor = self.cx.execute(query)
 
         return cursor
@@ -411,7 +411,7 @@ class SimpleKeyStore:
 
     def update_key(
         self,
-        id_to_update,
+        id_to_update : int,
         name: str = None,
         active: bool = None,
         expiration_in_sse: int = None,
@@ -422,6 +422,9 @@ class SimpleKeyStore:
         """Update the key record with the given values. Raises error if update fails."""
         params = {}
         set_clause = []
+
+        if type(id_to_update).__name__ != 'int':
+            raise ValueError(f"Expected id_to_update to be an integer, but got {type(id_to_update)}={id_to_update}")
 
         if name is not None:
             params["name"] = name
@@ -457,7 +460,9 @@ class SimpleKeyStore:
         if cursor.rowcount != 1:
             raise RuntimeError(f"Update failed with {sql=}, {params=}")
 
-    def mark_key_inactive(self, unencrypted_key: str):
+    def mark_key_inactive(self, unencrypted_key: str) -> int:
         """Mark the given key inactive."""
+        record = self.get_key_record(unencrypted_key)
+        number_of_records_updated = self.update_key(record['id'], active=False)
 
-        key_record = self.get_key_record(unencrypted_key)
+        return number_of_records_updated
