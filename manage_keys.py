@@ -11,20 +11,31 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
 
     while True:
         all_records = ks.get_matching_key_records()
+        print(f"Currently {len(all_records)} in {ks.name}")
 
         menu_items = [
             f"[A] List all {len(all_records)} keys in {ks.name}",
-            "[B]Show batch report",
             "[D] Delete a key",
             f"[N] Add new key to {ks.name}",
             f"[S] List the {len(new_records_list)} keys created this session.",
+            "[U]Show usability report",
             "[X] Exit",
         ]
 
         menu_string = "\n".join(menu_items)
-        choice = str(get_input(f"{menu_string}--\nWhat would you like to do (N,A,S,X)?", default="X")).upper()
+        choice = str(get_input(f"{menu_string}\n--\nWhat would you like to do?", default="X")).upper()
 
-        if choice == "N":
+        if choice == "A":
+            # Show all keys in the db
+            print(f"All records in {ks.name}")
+            ks.records_for_usability_report(print_records=True)
+
+        elif choice == "D":
+            key_to_delete = get_input("Enter key that should be deleted")
+            number_of_keys_deleted = ks.delete_key_record(unencrypted_key=key_to_delete)
+            print(f"{number_of_keys_deleted} keys deleted.")
+
+        elif choice == "N":
             new_record = add_single_key_interactive(ks, defaults)
 
             if use_last_answer_as_default:
@@ -38,11 +49,6 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
             new_records_list.append(new_record)
             print(ks.tabulate_records(new_records_list))
 
-        elif choice == "A":
-            # Show all keys in the db
-            print("All records in", ks.name)
-            ks.tabulate_records(all_records)
-
         elif choice == "S":
             # Show keys created this session
             print("Records created this session", ks.name)
@@ -50,12 +56,9 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
 
         elif choice == "X":
             break
-        elif choice == "D":
-            key_to_delete = get_input("Enter key that should be deleted")
-            number_of_keys_deleted = ks.delete_key_record(unencrypted_key=key_to_delete)
-            print(f"{number_of_keys_deleted} keys deleted.")
-        elif choice == "B":
-            ks.records_for_usability_report(call_print=True)
+        
+        elif choice == "U":
+            ks.usability_counts_report(print_counts=True)
 
 
 def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}) -> Dict:
