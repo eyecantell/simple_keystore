@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 
 def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
-    '''Offer CLI interactive menu to manage keys'''
+    """Offer CLI interactive menu to manage keys"""
     new_records_list = []
     use_last_answer_as_default = False if defaults else True
     print(f"{use_last_answer_as_default=}")
@@ -13,10 +13,11 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
         all_records = ks.get_matching_key_records()
 
         menu_items = [
-            f"[N] Add new key to {ks.name}",
             f"[A] List all {len(all_records)} keys in {ks.name}",
-            f"[S] List the {len(new_records_list)} keys created this session.",
+            "[B]Show batch report",
             "[D] Delete a key",
+            f"[N] Add new key to {ks.name}",
+            f"[S] List the {len(new_records_list)} keys created this session.",
             "[X] Exit",
         ]
 
@@ -53,7 +54,8 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
             key_to_delete = get_input("Enter key that should be deleted")
             number_of_keys_deleted = ks.delete_key_record(unencrypted_key=key_to_delete)
             print(f"{number_of_keys_deleted} keys deleted.")
-            
+        elif choice == "B":
+            ks.records_for_usability_report(call_print=True)
 
 
 def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}) -> Dict:

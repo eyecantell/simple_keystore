@@ -1,4 +1,5 @@
 from simple_key_store import SimpleKeyStore
+from datetime import datetime, timedelta
 
 TEST_KEYSTORE_NAME = "keystore_for_tests"
 ks = SimpleKeyStore(TEST_KEYSTORE_NAME)
@@ -203,6 +204,7 @@ def test_get_matching_key_records_no_args():
     # Clean up
     ks.delete_records_with_name(my_key_name)
 
+
 def test_get_key_record():
     """Get a specific key by giving hte unencrypted key value"""
     # Setup
@@ -216,7 +218,7 @@ def test_get_key_record():
 
     # Get the record from the db
     key_record = ks.get_key_record(unencrypted_key=my_key_value)
-    #print(f"{key_record=}")
+    # print(f"{key_record=}")
 
     assert key_record, "Failed to retrieve added key"
     assert key_record.get("key") == my_key_value, f"Expected {my_key_value=}, but got {key_record.get('key')}"
@@ -224,12 +226,13 @@ def test_get_key_record():
     # Clean up
     ks.delete_records_with_name(my_key_name)
 
+
 def test_encrypt_and_decrypt():
     keys_to_test = [
-        'gAAAAABmp7N54OH60IYC5mrY1nRowyHaw39d3C6zY',
-        '123abc_my_test',
-        '1',
-        'a',
+        "gAAAAABmp7N54OH60IYC5mrY1nRowyHaw39d3C6zY",
+        "123abc_my_test",
+        "1",
+        "a",
     ]
 
     # Encrypt and decrypt each key
@@ -239,8 +242,97 @@ def test_encrypt_and_decrypt():
         assert unencrypted_key == decrypted_key, f"Expected {unencrypted_key} but got {decrypted_key}"
 
 
+def test_records_sorted_for_batch_report():
+    # Setup
+    my_key_name = "test_records_sorted_for_batch_report"
+    ks.delete_records_with_name(my_key_name)
+    my_key_value = "123abc_" + my_key_name
+
+    # Add records in two batches:
+    # Batch one has active and inactive keys: active = True/False, batch='one'
+    # Batch two has active and inactive keys: active = True/False, batch='two'
+    new_ids = []
+    expiration_in_sse = 1234567890
+    for login in ["login1", "login2"]:
+        for active in [True, False]:
+            for batch in ["one", "two"]:
+                new_ids.append(
+                    ks.add_key(
+                        name=my_key_name,
+                        unencrypted_key=my_key_value,
+                        active=active,
+                        batch=batch,
+                        login=login,
+                        expiration_in_sse=expiration_in_sse,
+                    )
+                )
+                expiration_in_sse += 1000
+
+    # Get the report and check the expected values
+    records = ks.records_for_usability_report(key_name=my_key_name, call_print=False)
+    for r in records:
+        assert r.get("name") == my_key_name
+
+    for i in range(4):
+        # print(f"{records[i]=}")
+        assert records[i].get("login") == "login1", f"Expected record {i} login to be 'login1', but got {records[i]}"
+        assert (
+            records[i + 4].get("login") == "login2"
+        ), f"Expected record {i+4} login to be 'login2', but got {records[i+4]}"
+
+    for i in [0, 1, 4, 5]:
+        assert records[i].get("batch") == "one", f"Expected record {i} batch to be 'one', but got {records[i]}"
+        assert records[i + 2].get("batch") == "two", f"Expected record {i+2} batch to be 'two', but got {records[i+2]}"
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
+
+
+def test_usability_report():
+    # Setup
+    my_key_name = "test_usability_report"
+    ks.delete_records_with_name(my_key_name)
+    my_key_value = "123abc_" + my_key_name
+
+    # Add records
+    new_ids = []
+    yesterday = datetime.today() + timedelta(days=-1)
+    tomorrow = datetime.today() + timedelta(days=1)
+
+    for login in ["login1", "login2"]:
+        for source in ["a.com", "b.com", "c.com"]:
+            for expiration_date in [yesterday, tomorrow]:
+                for active in [True, False]:
+                    for batch in ["one", "two"]:
+                        for i in range(3):
+                            new_ids.append(
+                                ks.add_key(
+                                    name=my_key_name,
+                                    unencrypted_key=my_key_value + str(i),
+                                    active=active,
+                                    batch=batch,
+                                    expiration_in_sse=expiration_date.timestamp(),
+                                    login=login,
+                                    source=source,
+                                )
+                            )
+
+    # Get the report and check the expected values
+    usability_records = ks.keys_usability_report(key_name=my_key_name, print_records=True, print_counts=True)
+
+    assert len(usability_records) == 12, f"Expected 12 records, but got {len(usability_records)}"
+
+    # First four should be a.com, then b.com, c.com
+    for i in range(4):
+        # print(f"{records[i]=}")
+        assert usability_records[i].get("login") == "login1", f"Expected record {i} login to be 'login1', but got {usability_records[i]}"
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
+
+
 if __name__ == "__main__":
-    test_encrypt_and_decrypt()
+    """test_encrypt_and_decrypt()
     test_key_is_added_encrypted()
     test_add_and_retrieve_named_key_without_other_data()
     test_add_and_retrieve_named_key_with_all_fields()
@@ -249,4 +341,5 @@ if __name__ == "__main__":
     test_tabulate_records_matching()
     test_get_matching_key_records_no_args()
     test_get_key_record()
-    
+    test_records_sorted_for_batch_report()"""
+    test_usability_report()

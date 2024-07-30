@@ -1,4 +1,5 @@
 from cryptography.fernet import Fernet
+from datetime import datetime
 from tabulate import tabulate
 from typing import Any, Dict, List
 import os
@@ -60,6 +61,7 @@ class SimpleKeyStore:
 
     def keystore_columns(self) -> list[str]:
         """Return the list of columns in the keystore, in the order that they were created"""
+        # Keep this in sync with create_keystore_table_if_dne()
         return [
             "id",
             "name",
@@ -103,7 +105,7 @@ class SimpleKeyStore:
             ),
         )
         self.cx.commit()
-        #print("Added key with id", cursor.lastrowid)
+        # print("Added key with id", cursor.lastrowid)
         return cursor.lastrowid
 
     def _record_dicts_from_select_star_results(self, records: list) -> List[Dict]:
@@ -123,6 +125,11 @@ class SimpleKeyStore:
             else:
                 record_data[c] = record[i]
             i = i + 1
+
+        # Change the expiration_in_sse to a date
+        record_data["expiration_date"] = None
+        if record_data.get("expiration_in_sse"):
+            record_data["expiration_date"] = datetime.fromtimestamp(int(record_data.get("expiration_in_sse")))
 
         # Include the unencrypted key
         if include_unencrypted_key:
@@ -148,19 +155,19 @@ class SimpleKeyStore:
         if not records:
             return None
         return records[0]
-    
+
     def get_key_record(self, unencrypted_key: str) -> Dict:
         """Returns key record for the given (unencrypted) key."""
 
         # Because the salt value changes with each encryption, we have to decrypt each key to check against this one
         cursor = self.cx.execute(f"SELECT * FROM {self.KEYSTORE_TABLE_NAME}")
         records = self._record_dicts_from_select_star_results(cursor.fetchall())
-        for rec in records: 
-            if rec.get('key') == unencrypted_key:
+        for rec in records:
+            if rec.get("key") == unencrypted_key:
                 return rec
         # No record found with the key
         return None
-    
+
     def delete_key_record(self, unencrypted_key: str) -> int:
         """Delete any records with the given key value. Returns number of records deleted"""
         encrypted_key = self.encrypt_key(unencrypted_key)
@@ -267,9 +274,20 @@ class SimpleKeyStore:
 
         return cursor
 
-    def tabulate_records(self, records: List) -> str:
+    def tabulate_records(self, records: List[Dict], headers: List = None, sort_order: List = None) -> str:
+        """Return a string of tabulated records. If headers is blank will use all keys. If given will sort by keys listed in sort_order."""
         # Extracting the keys to use as headers
-        headers = records[0].keys() if records else []
+
+        if not records:
+            return "No records to tabulate"
+
+        # If no headers were passed, use all of the keys
+        if not headers:
+            headers = records[0].keys()
+
+        # If sort_order was passed, sort the records by the given keys (in order given)
+        if sort_order:
+            records.sort(key=lambda x: tuple(x.get(field) for field in sort_order))
 
         # Creating the table using the tabulate module
 
@@ -295,15 +313,80 @@ class SimpleKeyStore:
         num_records = int(cursor.fetchone()[0])
         # print(f"Number of records: {num_records}")
         return num_records
-    
-    def encrypt_key(self, unencrypted_key : str) -> str:
-        '''Encrypt the given key'''
+
+    def encrypt_key(self, unencrypted_key: str) -> str:
+        """Encrypt the given key"""
         encrypted_key = self.cipher.encrypt(unencrypted_key.encode())
-        #print(f"Encrypting\n{unencrypted_key=}\ngives:\n{encrypted_key}")
+        # print(f"Encrypting\n{unencrypted_key=}\ngives:\n{encrypted_key}")
         return encrypted_key
-    
-    def decrypt_key(self, encrypted_key : str) -> str:
-        '''Decrypt the given key'''
+
+    def decrypt_key(self, encrypted_key: str) -> str:
+        """Decrypt the given key"""
         decrypted_key = self.cipher.decrypt(encrypted_key).decode()
-        #print(f"Decrypting\n{encrypted_key=}\ngives:\n{decrypted_key}")
+        # print(f"Decrypting\n{encrypted_key=}\ngives:\n{decrypted_key}")
         return decrypted_key
+
+    def records_for_usability_report(
+        self,
+        key_name: str = None,
+        print_records: bool = False,
+        sort_order: List = ["name", "source", "login", "batch", "active", "expiration_date"],
+    ) -> List[Dict]:
+        """Get list of sorted key records with the given name. Gets ALL if no name given.
+        Will print a tabulated list of the records if print_records is True"""
+        key_records = self.get_matching_key_records(name=key_name)
+
+        # Calculate and add whether each record is expired and/or usable for each record
+        today = datetime.today()
+        for record in key_records:
+            record['expired'] = False if record.get("expiration_date") is None else (record['expiration_date'] < today)
+            record['usable'] = record['active'] and not record['expired']
+
+        key_records.sort(key=lambda x: tuple(x.get(field) for field in sort_order))
+
+        if print_records:
+            print(self.tabulate_records(key_records, headers=sort_order, sort_order=sort_order))
+        return key_records
+
+    def keys_usability_report(self, key_name: str = None, print_records: bool = False, print_counts=False) -> List[Dict]:
+        usability_records = self.records_for_usability_report(key_name, print_records)
+
+        # Count the number of records active/inactive(or expired) for each batch, where batch is combo of name, source, login, batch
+        
+        usable_count = {}
+        unusable_count = {}
+        qual_fields = ["name", "source", "login", "batch"]
+        delim = '+|+'
+        for record in usability_records:
+            # print(f"{record=}")
+
+            qualified_name = delim.join(str(record[field]) for field in qual_fields)
+            # print(f"{qualified_name=}")
+            if qualified_name not in usable_count:
+                usable_count[qualified_name] = 0
+            if qualified_name not in unusable_count:
+                unusable_count[qualified_name] = 0
+
+            if record["usable"]:
+                usable_count[qualified_name] += 1
+            else:
+                unusable_count[qualified_name] += 1
+
+        # Create records with the counts that we can tabulate
+        records_for_count_display = []
+        for qualified_name in usable_count.keys():
+            #print(f"{qualified_name}: usable={usable_count[qualified_name]}, unusable={unusable_count[qualified_name]}")
+            field_values = str(qualified_name).split(delim)
+            count_record = {}
+            i = 0
+            for field in qual_fields:
+                count_record[field] = field_values[i]
+                i += 1
+            count_record["usable"] = usable_count[qualified_name]
+            count_record["unusable"] = unusable_count[qualified_name]
+            records_for_count_display.append(count_record)
+
+        if print_counts:
+            print(self.tabulate_records(records_for_count_display))
+
+        return records_for_count_display
