@@ -296,8 +296,9 @@ class SimpleKeyStore:
             row = []
             for header in headers:
                 if "key" in header:
-                    # Limit keys to the first few characters
-                    value = str(rec.get(header, ""))[:18] + "..."
+                    # Limit keys to the first and last few characters
+                    if rec.get(header):
+                        value = str(rec.get(header))[:8] + "..." + rec.get(header)[-8:]
                 else:
                     # Limit other fields to 30 chars
                     value = str(rec.get(header, ""))[:30]
@@ -316,12 +317,16 @@ class SimpleKeyStore:
 
     def encrypt_key(self, unencrypted_key: str) -> str:
         """Encrypt the given key"""
+        if not unencrypted_key:
+            return None
         encrypted_key = self.cipher.encrypt(unencrypted_key.encode())
         # print(f"Encrypting\n{unencrypted_key=}\ngives:\n{encrypted_key}")
         return encrypted_key
 
     def decrypt_key(self, encrypted_key: str) -> str:
         """Decrypt the given key"""
+        if not encrypted_key:
+            return None
         decrypted_key = self.cipher.decrypt(encrypted_key).decode()
         # print(f"Decrypting\n{encrypted_key=}\ngives:\n{decrypted_key}")
         return decrypted_key
@@ -345,7 +350,7 @@ class SimpleKeyStore:
         key_records.sort(key=lambda x: tuple(x.get(field) for field in sort_order))
 
         if print_records:
-            print(self.tabulate_records(key_records, headers=sort_order, sort_order=sort_order))
+            print(self.tabulate_records(key_records, headers=sort_order+['expired', 'usable', 'key'], sort_order=sort_order))
         return key_records
 
     def usability_counts_report(
