@@ -168,7 +168,7 @@ def test_tabulate_records_matching():
     # Tabulate the records
     records = ks.get_matching_key_records(name=my_key_name)
     tabulated = ks.tabulate_records(records)
-    print(tabulated)
+    #print(tabulated)
     for header in ["id", "name", "expiration_in_sse", "active", "batch", "source", "login", "encrypted_key", "key"]:
         assert header in tabulated, f"Expected {header=} in tabulated, but did not find it: \n{tabulated}"
 
@@ -318,7 +318,7 @@ def test_usability_report():
                             )
 
     # Get the report and check the expected values
-    usability_records = ks.usability_counts_report(key_name=my_key_name, print_records=True, print_counts=True)
+    usability_records = ks.usability_counts_report(key_name=my_key_name, print_records=False, print_counts=False)
 
     assert len(usability_records) == 12, f"Expected 12 records, but got {len(usability_records)}"
 
@@ -360,6 +360,105 @@ def test_usability_report():
     ks.delete_records_with_name(my_key_name)
 
 
+def test_update_record_individual_fields():
+    """Update each field individually. Tests update_record()"""
+
+    # Setup
+    my_key_name = "test_update_record"
+    my_key_value = "123abc_" + my_key_name
+    ks.delete_records_with_name(my_key_name)
+    key_info = {
+        "name": my_key_name,
+        "key": my_key_value,
+        "active": True,
+        "batch": "mybatch",
+        "expiration_in_sse": 123456,
+        "login": "mylogin",
+        "source": "mysource",
+    }
+
+    # Add the key
+    record_id = ks.add_key(
+        name=key_info["name"],
+        unencrypted_key=key_info["key"],
+        active=key_info["active"],
+        batch=key_info["batch"],
+        expiration_in_sse=key_info["expiration_in_sse"],
+        login=key_info["login"],
+        source=key_info["source"],
+    )
+
+    updated_key_info = {
+        "name": my_key_name + "_updated",
+        "active": False,
+        "batch": "mybatch_updated",
+        "expiration_in_sse": 1234567890,
+        "login": "mylogin_updated",
+        "source": "mysource_updated",
+    }
+
+    # Update each field individually and check to see it was updated
+    for field, value in updated_key_info.items():
+        ks.update_key(record_id, **{field: value})
+        retrieved_record = ks.get_key_record_by_id(record_id)
+        assert (
+            retrieved_record.get(field) == value
+        ), f"Expected {field} = '{value}' but got {retrieved_record.get(field)}"
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
+    ks.delete_records_with_name(my_key_name + "_updated")
+
+def test_update_record_all_fields():
+    """Update all fields at once. Tests update_record()"""
+
+    # Setup
+    my_key_name = "test_update_record_all_fields"
+    my_key_value = "123abc_" + my_key_name
+    ks.delete_records_with_name(my_key_name)
+    key_info = {
+        "name": my_key_name,
+        "key": my_key_value,
+        "active": True,
+        "batch": "mybatch",
+        "expiration_in_sse": 123456,
+        "login": "mylogin",
+        "source": "mysource",
+    }
+
+    # Add the key
+    record_id = ks.add_key(
+        name=key_info["name"],
+        unencrypted_key=key_info["key"],
+        active=key_info["active"],
+        batch=key_info["batch"],
+        expiration_in_sse=key_info["expiration_in_sse"],
+        login=key_info["login"],
+        source=key_info["source"],
+    )
+
+    updated_key_info = {
+        "name": my_key_name + "_updated",
+        "active": False,
+        "batch": "mybatch_updated",
+        "expiration_in_sse": 1234567890,
+        "login": "mylogin_updated",
+        "source": "mysource_updated",
+    }
+
+    # Update all fields and check they were updated
+    ks.update_key(record_id, **updated_key_info)
+    retrieved_record = ks.get_key_record_by_id(record_id)
+
+    for field, value in updated_key_info.items():
+        assert (
+            retrieved_record.get(field) == value
+        ), f"Expected {field} = '{value}' but got {retrieved_record.get(field)}"
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
+    ks.delete_records_with_name(my_key_name + "_updated")
+
 if __name__ == "__main__":
     test_encrypt_and_decrypt()
     test_key_is_added_encrypted()
@@ -372,3 +471,5 @@ if __name__ == "__main__":
     test_get_key_record()
     test_records_sorted_for_batch_report()
     test_usability_report()
+    test_update_record_individual_fields()
+    test_update_record_all_fields()

@@ -269,7 +269,7 @@ class SimpleKeyStore:
             cursor = self.cx.execute(query + where_clause, tuple(values))
         else:
             # Just run the query as-is
-            print(f"Executing {query=}")
+            #print(f"Executing {query=}")
             cursor = self.cx.execute(query)
 
         return cursor
@@ -297,8 +297,9 @@ class SimpleKeyStore:
             for header in headers:
                 if "key" in header:
                     # Limit keys to the first and last few characters
-                    if rec.get(header):
-                        value = str(rec.get(header))[:8] + "..." + rec.get(header)[-8:]
+                    key_value = str(rec.get(header))
+                    if key_value:
+                        value = key_value[:8] + "..." + key_value[-8:]
                 else:
                     # Limit other fields to 30 chars
                     value = str(rec.get(header, ""))[:30]
@@ -407,3 +408,56 @@ class SimpleKeyStore:
             print(self.tabulate_records(records_for_count_display))
 
         return records_for_count_display
+
+    def update_key(
+        self,
+        id_to_update,
+        name: str = None,
+        active: bool = None,
+        expiration_in_sse: int = None,
+        batch: str = None,
+        source: str = None,
+        login: str = None,
+    ):
+        """Update the key record with the given values. Raises error if update fails."""
+        params = {}
+        set_clause = []
+
+        if name is not None:
+            params["name"] = name
+            set_clause.append("name = :name")
+
+        if active is not None:
+            params["active"] = active
+            set_clause.append("active = :active")
+
+        if expiration_in_sse is not None:
+            params["expiration_in_sse"] = expiration_in_sse
+            set_clause.append("expiration_in_sse = :expiration_in_sse")
+
+        if batch is not None:
+            params["batch"] = batch
+            set_clause.append("batch = :batch")
+
+        if source is not None:
+            params["source"] = source
+            set_clause.append("source = :source")
+
+        if login is not None:
+            params["login"] = login
+            set_clause.append("login = :login")
+
+        if not set_clause:
+            # Noting was given to set
+            return
+
+        sql = f"UPDATE {self.KEYSTORE_TABLE_NAME} SET {', '.join(set_clause)} WHERE id = :id"
+        cursor = self.cx.execute(sql, {"id": int(id_to_update), **params})
+
+        if cursor.rowcount != 1:
+            raise RuntimeError(f"Update failed with {sql=}, {params=}")
+
+    def mark_key_inactive(self, unencrypted_key: str):
+        """Mark the given key inactive."""
+
+        key_record = self.get_key_record(unencrypted_key)

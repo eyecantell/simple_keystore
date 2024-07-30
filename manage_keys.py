@@ -16,6 +16,7 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
         menu_items = [
             f"[A] List all {len(all_records)} keys in {ks.name}",
             "[D] Delete a key",
+            "[M] Mark key inactive, and get next available.",
             f"[N] Add new key to {ks.name}",
             f"[S] List the {len(new_records_list)} keys created this session.",
             "[U]Show usability report",
