@@ -339,8 +339,8 @@ class SimpleKeyStore:
         # Calculate and add whether each record is expired and/or usable for each record
         today = datetime.today()
         for record in key_records:
-            record['expired'] = False if record.get("expiration_date") is None else (record['expiration_date'] < today)
-            record['usable'] = record['active'] and not record['expired']
+            record["expired"] = False if record.get("expiration_date") is None else (record["expiration_date"] < today)
+            record["usable"] = record["active"] and not record["expired"]
 
         key_records.sort(key=lambda x: tuple(x.get(field) for field in sort_order))
 
@@ -348,45 +348,53 @@ class SimpleKeyStore:
             print(self.tabulate_records(key_records, headers=sort_order, sort_order=sort_order))
         return key_records
 
-    def keys_usability_report(self, key_name: str = None, print_records: bool = False, print_counts=False) -> List[Dict]:
+    def usability_counts_report(
+        self, key_name: str = None, print_records: bool = False, print_counts=False
+    ) -> List[Dict]:
         usability_records = self.records_for_usability_report(key_name, print_records)
 
-        # Count the number of records active/inactive(or expired) for each batch, where batch is combo of name, source, login, batch
-        
-        usable_count = {}
-        unusable_count = {}
+        # Count the number of usable records for each set, where avset is combo of name, source, login, batch
+        usable_count_by_qualified_name = {}
+        unusable_count_by_qualified_name = {}
+        usable_count = 0
+        unusable_count = 0
         qual_fields = ["name", "source", "login", "batch"]
-        delim = '+|+'
+        delim = "+|+"
         for record in usability_records:
             # print(f"{record=}")
 
             qualified_name = delim.join(str(record[field]) for field in qual_fields)
             # print(f"{qualified_name=}")
-            if qualified_name not in usable_count:
-                usable_count[qualified_name] = 0
-            if qualified_name not in unusable_count:
-                unusable_count[qualified_name] = 0
+            if qualified_name not in usable_count_by_qualified_name:
+                usable_count_by_qualified_name[qualified_name] = 0
+            if qualified_name not in unusable_count_by_qualified_name:
+                unusable_count_by_qualified_name[qualified_name] = 0
 
             if record["usable"]:
-                usable_count[qualified_name] += 1
+                usable_count_by_qualified_name[qualified_name] += 1
+                usable_count += 1
             else:
-                unusable_count[qualified_name] += 1
+                unusable_count_by_qualified_name[qualified_name] += 1
+                unusable_count += 1
 
         # Create records with the counts that we can tabulate
         records_for_count_display = []
-        for qualified_name in usable_count.keys():
-            #print(f"{qualified_name}: usable={usable_count[qualified_name]}, unusable={unusable_count[qualified_name]}")
+        for qualified_name in usable_count_by_qualified_name.keys():
+            # print(f"{qualified_name}: usable={usable_count_by_qualified_name[qualified_name]}, unusable={unusable_count_by_qualified_name[qualified_name]}")
             field_values = str(qualified_name).split(delim)
             count_record = {}
             i = 0
             for field in qual_fields:
                 count_record[field] = field_values[i]
                 i += 1
-            count_record["usable"] = usable_count[qualified_name]
-            count_record["unusable"] = unusable_count[qualified_name]
+            count_record["usable"] = usable_count_by_qualified_name[qualified_name]
+            count_record["unusable"] = unusable_count_by_qualified_name[qualified_name]
             records_for_count_display.append(count_record)
 
         if print_counts:
+            print(
+                f"Usability counts ({len(usability_records)} records total, {usable_count} usable, {unusable_count} not)"
+            )
             print(self.tabulate_records(records_for_count_display))
 
         return records_for_count_display

@@ -269,7 +269,7 @@ def test_records_sorted_for_batch_report():
                 expiration_in_sse += 1000
 
     # Get the report and check the expected values
-    records = ks.records_for_usability_report(key_name=my_key_name, call_print=False)
+    records = ks.records_for_usability_report(key_name=my_key_name, print_records=False)
     for r in records:
         assert r.get("name") == my_key_name
 
@@ -318,21 +318,47 @@ def test_usability_report():
                             )
 
     # Get the report and check the expected values
-    usability_records = ks.keys_usability_report(key_name=my_key_name, print_records=True, print_counts=True)
+    usability_records = ks.usability_counts_report(key_name=my_key_name, print_records=True, print_counts=True)
 
     assert len(usability_records) == 12, f"Expected 12 records, but got {len(usability_records)}"
 
     # First four should be a.com, then b.com, c.com
     for i in range(4):
         # print(f"{records[i]=}")
-        assert usability_records[i].get("login") == "login1", f"Expected record {i} login to be 'login1', but got {usability_records[i]}"
+        assert (
+            usability_records[i].get("source") == "a.com"
+        ), f"Expected record {i} source to be 'a.com', but got {usability_records[i].get('source')}"
+        assert (
+            usability_records[i + 4].get("source") == "b.com"
+        ), f"Expected record {i+4} source to be 'b.com', but got {usability_records[i+4].get('source')}"
+        assert (
+            usability_records[i + 8].get("source") == "c.com"
+        ), f"Expected record {i+8} source to be 'c.com', but got {usability_records[i+4].get('source')}"
+
+    # Should get two each of login1, login2
+    for i in [0, 1, 4, 5, 8, 9]:
+        assert (
+            usability_records[i].get("login") == "login1"
+        ), f"Expected record {i} login to be 'login1', but got {usability_records[i].get('login')}"
+        assert (
+            usability_records[i + 2].get("login") == "login2"
+        ), f"Expected record {i+2} login to be 'login2', but got {usability_records[i+2].get('login')}"
+
+    for i in range(12):
+        batch = "two" if i%2 else "one"
+        assert (
+            usability_records[i].get("batch") == batch
+        ), f"Expected record {i} batch to be 'login1', but got {usability_records[i].get('batch')}"
+        assert usability_records[i].get("usable") == 3, f"Expected record {i} usable count to be 3, but got {usability_records[i].get('usable')}"
+        assert usability_records[i].get("unusable") == 9, f"Expected record {i} unusable count to be 9, but got {usability_records[i].get('unusable')}"
+
 
     # Clean up
     ks.delete_records_with_name(my_key_name)
 
 
 if __name__ == "__main__":
-    """test_encrypt_and_decrypt()
+    test_encrypt_and_decrypt()
     test_key_is_added_encrypted()
     test_add_and_retrieve_named_key_without_other_data()
     test_add_and_retrieve_named_key_with_all_fields()
@@ -341,5 +367,5 @@ if __name__ == "__main__":
     test_tabulate_records_matching()
     test_get_matching_key_records_no_args()
     test_get_key_record()
-    test_records_sorted_for_batch_report()"""
+    test_records_sorted_for_batch_report()
     test_usability_report()
