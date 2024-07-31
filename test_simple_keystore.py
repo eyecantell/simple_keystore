@@ -541,13 +541,38 @@ def test_get_next_usable_key():
     record_id = ks.add_key(
         name=my_key_name,
         unencrypted_key=my_key_value,
+        source="a.com",
     )
 
+    record = ks.get_key_record_by_id(record_id)
+    print(f"{record=}")
+
     # Get next usable key
-    ks.get_next_usable_key(name=my_key_name)
+    next_key = ks.get_next_usable_key(name=my_key_name)
+    assert next_key == my_key_value, f"Expected next usable key to be {my_key_value} but got {next_key}"
 
     # Clean up
     ks.delete_records_with_name(my_key_name)
+
+
+def test_record_is_in_set():
+    # Setup
+    my_key_name = "test_record_is_in_set"
+
+    record = {"name": my_key_name}
+    record_set = {"usable": 6}
+
+    for field in ks.set_defining_fields:
+        record[field] = field + "_value"
+        record_set[field] = field + "_value"
+
+    assert ks.record_is_in_set(record, record_set), f"Expected record to be in set.\n    {record=}\n{record_set=}"
+
+    # Change one of the fields in the set
+    record_set[ks.set_defining_fields[0]] += "123"
+    assert not ks.record_is_in_set(
+        record, record_set
+    ), f"Expected record NOT to be in set.\n    {record=}\n{record_set=}"
 
 
 if __name__ == "__main__":
@@ -565,4 +590,5 @@ if __name__ == "__main__":
     test_update_record_individual_fields()
     test_update_record_all_fields()
     test_mark_key_inactive()"""
+    # test_record_is_in_set()
     test_get_next_usable_key()
