@@ -1,6 +1,11 @@
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 from simple_key_store import SimpleKeyStore
 from datetime import datetime, timedelta
+
+
+def show_records(ks: SimpleKeyStore, records: List):
+    headers = ["id", "name"] + ks.set_defining_fields + ["expiration_date", "expired", "usable", "key"]
+    print(ks.tabulate_records(records, headers))
 
 
 def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
@@ -29,18 +34,17 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
 
         if choice == "A":
             # Add a new key
-            new_record = add_single_key_interactive(ks, defaults)
+            new_record, answer = add_single_key_interactive(ks, defaults)
 
             if use_last_answer_as_default:
-                # Set the defaults for the next key based on the data for the previous key
-                for field in new_record.keys():
-                    if field in ["encrypted_key", "key"]:
-                        continue
-                    defaults[field] = new_record[field]
+                # Set the defaults for the next key based on the answer given for the previous key
+                defaults = answer
+                print(f"{defaults=}")
+                del defaults['unencrypted_key']
 
             # Add the new record to our list of records and show the list of created records
             new_records_list.append(new_record)
-            print(ks.tabulate_records(new_records_list))
+            show_records(ks, new_records_list)
 
         elif choice == "D":
             key_to_delete = get_input("Enter key that should be deleted")
@@ -53,10 +57,25 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
             print(f"All records in {ks.name}")
             ks.records_for_usability_report(print_records=True)
 
+        elif choice == "M":
+            # Mark the given key inactive and get the next available key
+            key_to_make_inactive = get_input("Enter key that should be made inactive")
+            record = ks.get_key_record(key_to_make_inactive)
+            if not record:
+                print(f"Did not find a record with key {key_to_make_inactive}")
+                continue
+            number_of_keys_updated = ks.update_key(id_to_update=record['id'],active=False)
+            print(f"{number_of_keys_updated} keys updated to inactive.")
+            next_key = ks.get_next_usable_key(name=record.get('name'))
+            if next_key is None:
+                print(f"No keys left with name {record['name']}")
+            else:
+                print(f"Next available key with name {record['name']} is:\n{next_key}")
+
         elif choice == "S":
             # Show keys created this session
             print("Records created this session", ks.name)
-            ks.tabulate_records(new_records_list)
+            show_records(ks, new_records_list)
 
         elif choice == "X":
             break
@@ -65,8 +84,8 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
             ks.usability_counts_report(print_counts=True)
 
 
-def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}) -> Dict:
-    """Prompt user for entries to create a single key record. Returns a dict of the new record values."""
+def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}) -> Tuple[Dict, Dict]:
+    """Prompt user for entries to create a single key record. Returns a dict of the new record values, and the answers given."""
     required_fields = ["name"]
     answer = {}
 
@@ -81,21 +100,22 @@ def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}) -> Dict:
         answer[field] = answer_from_user
 
     answer["active"] = True if "y" in str(get_input("Is the key active?", default="Yes")).lower() else False
-    answer["expiration_in_sse"] = get_expiration_seconds_from_input(defaults.get("expiration_in_sse"))
-    # print(f"{answer=}")
+    expiration_in_sse, expiration_input = get_expiration_seconds_from_input(defaults.get("expiration_input"))
+    answer['expiration_input'] = expiration_input
+    print(f"{answer=}")
 
     new_id = ks.add_key(
         name=answer["name"],
         unencrypted_key=answer["unencrypted_key"],
         active=answer["active"],
-        expiration_in_sse=answer["expiration_in_sse"],
+        expiration_in_sse=expiration_in_sse,
         batch=answer["batch"],
         source=answer["source"],
         login=answer["login"],
     )
 
     new_record = ks.get_key_record_by_id(new_id)
-    return new_record
+    return new_record, answer
 
 
 # Now you can use these values to insert a new record into the database
@@ -111,7 +131,8 @@ def get_input(question: str, required: bool = False, default: Any = None) -> Any
             return answer
 
 
-def get_expiration_seconds_from_input(default) -> int:
+def get_expiration_seconds_from_input(default) -> Tuple[int, str]:
+    '''Gets user input for expiration date. Returns seconds since epoch and answer given'''
     expiration_input = get_input(
         "Enter the expiration time in number of days or a specific date (YYYY-MM-DD): ", default=default
     )
@@ -128,7 +149,7 @@ def get_expiration_seconds_from_input(default) -> int:
 
     expiration_seconds = int(expiration_date.timestamp())
 
-    return expiration_seconds
+    return expiration_seconds, expiration_input
 
 
 if __name__ == "__main__":
