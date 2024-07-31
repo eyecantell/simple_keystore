@@ -1,6 +1,8 @@
 from typing import Any, Dict, List, Tuple
 from simple_key_store import SimpleKeyStore
 from datetime import datetime, timedelta
+import argparse
+import os
 
 
 def show_records(ks: SimpleKeyStore, records: List):
@@ -16,7 +18,7 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
 
     while True:
         all_records = ks.get_matching_key_records()
-        print(f"Currently {len(all_records)} in {ks.name}")
+        print(f"Currently have {len(all_records)} records in {ks.name}")
 
         menu_items = [
             f"[A] Add new key to {ks.name}",
@@ -40,7 +42,7 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
                 # Set the defaults for the next key based on the answer given for the previous key
                 defaults = answer
                 print(f"{defaults=}")
-                del defaults['unencrypted_key']
+                del defaults["unencrypted_key"]
 
             # Add the new record to our list of records and show the list of created records
             new_records_list.append(new_record)
@@ -64,9 +66,9 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
             if not record:
                 print(f"Did not find a record with key {key_to_make_inactive}")
                 continue
-            number_of_keys_updated = ks.update_key(id_to_update=record['id'],active=False)
+            number_of_keys_updated = ks.update_key(id_to_update=record["id"], active=False)
             print(f"{number_of_keys_updated} keys updated to inactive.")
-            next_key = ks.get_next_usable_key(name=record.get('name'))
+            next_key = ks.get_next_usable_key(name=record.get("name"))
             if next_key is None:
                 print(f"No keys left with name {record['name']}")
             else:
@@ -101,7 +103,7 @@ def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}) -> Tuple
 
     answer["active"] = True if "y" in str(get_input("Is the key active?", default="Yes")).lower() else False
     expiration_in_sse, expiration_input = get_expiration_seconds_from_input(defaults.get("expiration_input"))
-    answer['expiration_input'] = expiration_input
+    answer["expiration_input"] = expiration_input
     print(f"{answer=}")
 
     new_id = ks.add_key(
@@ -132,7 +134,7 @@ def get_input(question: str, required: bool = False, default: Any = None) -> Any
 
 
 def get_expiration_seconds_from_input(default) -> Tuple[int, str]:
-    '''Gets user input for expiration date. Returns seconds since epoch and answer given'''
+    """Gets user input for expiration date. Returns seconds since epoch and answer given"""
     expiration_input = get_input(
         "Enter the expiration time in number of days or a specific date (YYYY-MM-DD): ", default=default
     )
@@ -153,5 +155,14 @@ def get_expiration_seconds_from_input(default) -> Tuple[int, str]:
 
 
 if __name__ == "__main__":
-    ks = SimpleKeyStore("interactive_test")
+    parser = argparse.ArgumentParser(usage="python manage_keys.py [keystore.db]", description="Simple keystore manager")
+
+    # Add the argument for the keystore db
+    parser.add_argument("keystore_db", help="The keystore database to manage")
+
+    args = parser.parse_args()
+    if not os.path.isfile(args.keystore_db):
+        raise RuntimeError(f"Cannot locate keystore db: {args.keystore_db}")
+
+    ks = SimpleKeyStore(args.keystore_db)
     manage_keys(ks)
