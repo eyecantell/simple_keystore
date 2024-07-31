@@ -538,18 +538,58 @@ def test_get_next_usable_key():
     ks.delete_records_with_name(my_key_name)
 
     # Add a key
-    record_id = ks.add_key(
+    ks.add_key(
         name=my_key_name,
         unencrypted_key=my_key_value,
-        source="a.com",
     )
 
-    record = ks.get_key_record_by_id(record_id)
-    print(f"{record=}")
+    # record = ks.get_key_record_by_id(record_id)
+    # print(f"{record=}")
 
-    # Get next usable key
+    # Get next usable key and make sure its the one we added
     next_key = ks.get_next_usable_key(name=my_key_name)
     assert next_key == my_key_value, f"Expected next usable key to be {my_key_value} but got {next_key}"
+
+    # Add another key, this time with an expiration date in three days
+    three_days_from_now = datetime.today() + timedelta(days=3)
+    expiring_in_3_days_key_value = my_key_value + "_exp3"
+    ks.add_key(
+        name=my_key_name,
+        unencrypted_key=expiring_in_3_days_key_value,
+        expiration_in_sse=three_days_from_now.timestamp(),
+    )
+
+    # Get next usable key and make sure its the one we added that expires in three days
+    next_key = ks.get_next_usable_key(name=my_key_name)
+    assert (
+        next_key == expiring_in_3_days_key_value
+    ), f"Expected next usable key to be {expiring_in_3_days_key_value} but got {next_key}"
+
+    # Add another key, this time with an expiration date tomorrow
+    tomorrow = datetime.today() + timedelta(days=1)
+    expiring_tomorrow_key_value = my_key_value + "_exp1"
+    ks.add_key(name=my_key_name, unencrypted_key=expiring_tomorrow_key_value, expiration_in_sse=tomorrow.timestamp())
+
+    # Get next usable key and make sure its the one we added that expires tomorrow
+    next_key = ks.get_next_usable_key(name=my_key_name)
+    assert (
+        next_key == expiring_tomorrow_key_value
+    ), f"Expected next usable key to be {expiring_tomorrow_key_value} but got {next_key}"
+
+    # Add another key with an expiration date of tomorrow, but change source so its in another set
+    expiring_tomorrow_key_value_in_new_set = my_key_value + "_exp1_newset"
+    ks.add_key(
+        name=my_key_name,
+        unencrypted_key=expiring_tomorrow_key_value_in_new_set,
+        expiration_in_sse=tomorrow.timestamp(),
+        source="my source",
+    )
+
+    # Get next usable key and make sure its the one we added that expires tomorrow and is in its own set
+    next_key = ks.get_next_usable_key(name=my_key_name)
+    assert (
+        next_key == expiring_tomorrow_key_value_in_new_set
+    ), f"Expected next usable key to be {expiring_tomorrow_key_value_in_new_set} but got {next_key}"
 
     # Clean up
     ks.delete_records_with_name(my_key_name)
@@ -573,6 +613,16 @@ def test_record_is_in_set():
     assert not ks.record_is_in_set(
         record, record_set
     ), f"Expected record NOT to be in set.\n    {record=}\n{record_set=}"
+
+    # Reset the record_set to be equal to the record for hte set defining fields
+    record_set.update({field: record[field] for field in ks.set_defining_fields})
+
+    # Set one of the fields to None in both record and record_set and verify the record is still in the set
+    record[ks.set_defining_fields[0]] = None
+    record_set[ks.set_defining_fields[0]] = None
+    assert ks.record_is_in_set(
+        record, record_set
+    ), f"Expected record with None value to be in set.\n    {record=}\n{record_set=}"
 
 
 if __name__ == "__main__":

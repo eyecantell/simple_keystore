@@ -502,8 +502,8 @@ class SimpleKeyStore:
             field_values = str(set_name).split(delim)
             i = 0
             for field in self.set_defining_fields:
-                #print(f"{type(field_values[i])}, {field_values[i]=}")
-                set_record[field] = None if field_values[i] == 'None' else field_values[i]
+                # print(f"{type(field_values[i])}, {field_values[i]=}")
+                set_record[field] = None if field_values[i] == "None" else field_values[i]
                 i += 1
 
             # Add the counts
@@ -521,24 +521,24 @@ class SimpleKeyStore:
 
     def record_is_in_set(self, record: Dict, record_set: Dict) -> bool:
         """Returns true if record and set match on all the set defining fields"""
-        print("record_is_in_set checking:")
+        # print("record_is_in_set checking:")
 
         for field in self.set_defining_fields:
-            print(f"  checking {field}: {type(record.get(field))} {record.get(field)}, {type(record_set.get(field))} {record_set.get(field)}")
-            
+            # print(f"  checking {field}: {type(record.get(field))} {record.get(field)}, {type(record_set.get(field))} {record_set.get(field)}")
+
             if record.get(field) != record_set.get(field):
-                #print(f"    {record[field]} != {record_set[field]}")
+                # print(f"    {record[field]} != {record_set[field]}")
                 return False
-            #print(f"    {record[field]} == {record_set[field]}")
+            # print(f"    {record[field]} == {record_set[field]}")
         return True
 
     def get_set_for_record(self, record: Dict, record_set_list: List[Dict]) -> Dict:
         """Returns the record set (Dict) of the set that matches the given record."""
         for record_set in record_set_list:
             if self.record_is_in_set(record, record_set):
-                print("Found record set for record")
+                # print("Found record set for record")
                 return record_set
-        print("Did not find record set for record")
+        # print("Did not find record set for record")
         return None
 
     def get_next_usable_key(
@@ -559,7 +559,7 @@ class SimpleKeyStore:
             login=login,
         )
 
-        print(f"Got {len(matching_records)} matching records")
+        # print(f"Got {len(matching_records)} matching records")
         # Find the soonest upcoming expiration date
         soonest_expiration = None
         for record in matching_records:
@@ -567,7 +567,7 @@ class SimpleKeyStore:
                 continue
             if soonest_expiration is None or record["expiration_date"] < soonest_expiration:
                 soonest_expiration = record["expiration_date"]
-        print(f"{soonest_expiration=}")
+        # print(f"{soonest_expiration=}")
 
         # Get the records that are soonest to expire (within 12 hours)
         soon_to_expire_records = []
@@ -576,13 +576,14 @@ class SimpleKeyStore:
             if record["expiration_date"] is None:
                 continue
             time_diff = record["expiration_date"] - soonest_expiration
-            if time_diff < twelve_hours_in_seconds:
+            if time_diff.total_seconds() < twelve_hours_in_seconds:
                 soon_to_expire_records.append(record)
 
-        print(self.tabulate_records(soon_to_expire_records))
+        # print(self.tabulate_records(soon_to_expire_records, headers=['id','name','expiration_date','key'] + self.set_defining_fields))
         # If only one record has soonest expiration just return it
         if len(soon_to_expire_records) == 1:
-            return soon_to_expire_records[0]
+            # print("Only one record, returning")
+            return soon_to_expire_records[0]["key"]
 
         if not soon_to_expire_records:
             # None of the records have an expiration date
@@ -590,17 +591,17 @@ class SimpleKeyStore:
 
         # Break the "tie" by choosing the record with the least number of usable records in its set
         record_set_list = self.get_sets_of_records_with_counts(matching_records)
-        print(f"{record_set_list=}")
+        # print(f"{record_set_list=}")
         record_with_min_usable_set = None
         min_usable = None
         for record in soon_to_expire_records:
             record_set = self.get_set_for_record(record, record_set_list)
-            print(f"{record_set=}")
+            # print(f"{record_set=}")
             if min_usable is None or record_set.get("usable") < min_usable:
                 min_usable = record_set.get("usable")
                 record_with_min_usable_set = record
 
-        print(f"{record_with_min_usable_set=}")
+        # print(f"{record_with_min_usable_set=}")
         if record_with_min_usable_set:
             return record_with_min_usable_set.get("key")
         return None
