@@ -1,7 +1,7 @@
 from simple_key_store import SimpleKeyStore
 from datetime import datetime, timedelta
 
-TEST_KEYSTORE_NAME = "keystore_for_tests"
+TEST_KEYSTORE_NAME = "keystore_for_tests.db"
 ks = SimpleKeyStore(TEST_KEYSTORE_NAME)
 
 
