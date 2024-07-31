@@ -7,10 +7,10 @@ import sqlite3
 
 
 class SimpleKeyStore:
-    def __init__(self, name: str = "simple_keystore"):
+    def __init__(self, name: str = "simple_keystore.db"):
         self.name = name
         self.keystore_key = self.get_simple_keystore_key()
-        self.cx = sqlite3.connect(self.name + ".db")
+        self.cx = sqlite3.connect(self.name)
         self.cipher = Fernet(self.keystore_key)
         self.KEYSTORE_TABLE_NAME = "keystore"
         self.create_keystore_table_if_dne()
