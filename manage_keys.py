@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Tuple
-from simple_key_store import SimpleKeyStore
+from simple_keystore import SimpleKeyStore
 from datetime import datetime, timedelta
 import argparse
 import os

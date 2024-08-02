@@ -1,4 +1,4 @@
-from simple_key_store import SimpleKeyStore
+from simple_keystore import SimpleKeyStore
 from datetime import datetime, timedelta
 
 TEST_KEYSTORE_NAME = "keystore_for_tests.db"
