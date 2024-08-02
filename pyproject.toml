@@ -1,6 +1,6 @@
 [project]
 name = "simple_keystore"
-version = "0.2.3"
+version = "0.2.5"
 description = "\"A simple encrypted key storage\""
 authors = [
     {name = "Paul", email = "paul@nowfree.org"},
@@ -35,4 +35,4 @@ Repository = "https://github.com/eyecantell/simple_keystore"
 Issues = "https://github.com/eyecantell/simple_keystore/issues"
 
 [project.scripts]
-manage_simple_keys = "simple_keystore.manage_keys:main"
+manage_simple_keys = "manage_simple_keys:main"
