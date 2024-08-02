@@ -154,7 +154,7 @@ def get_expiration_seconds_from_input(default) -> Tuple[int, str]:
     return expiration_seconds, expiration_input
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(usage="python manage_keys.py [keystore.db]", description="Simple keystore manager")
 
     # Add the argument for the keystore db
@@ -166,3 +166,6 @@ if __name__ == "__main__":
 
     ks = SimpleKeyStore(args.keystore_db)
     manage_keys(ks)
+
+if __name__ == "__main__":
+    main()
