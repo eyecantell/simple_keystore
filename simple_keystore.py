@@ -187,6 +187,7 @@ class SimpleKeyStore:
         key_record = self.get_key_record(unencrypted_key)
         cursor = self.cx.execute(f"DELETE FROM {self.KEYSTORE_TABLE_NAME} WHERE id=?", (key_record["id"],))
         # print(f"Deleted {cursor.rowcount} records with {encrypted_key=}")
+        self.cx.commit()
         return cursor.rowcount
 
     def close_connection(self):
@@ -449,6 +450,7 @@ class SimpleKeyStore:
 
         if cursor.rowcount != 1:
             raise RuntimeError(f"Update failed with {sql=}, {params=}")
+        self.cx.commit()
 
     def mark_key_inactive(self, unencrypted_key: str) -> int:
         """Mark the given key inactive."""
