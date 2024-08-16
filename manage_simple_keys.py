@@ -24,7 +24,7 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
             f"[A] Add new key to {ks.name}",
             "[D] Delete a key",
             f"[L] List all {len(all_records)} keys in {ks.name}",
-            "[M] Mark key inactive, and get next available.",
+            "[N] Mark key inactive, and get next available.",
             f"[S] List the {len(new_records_list)} keys created this session.",
             "[U] Show usability counts report",
             "[V] TODO Delete unusable (inactive or expired) keys",
@@ -60,6 +60,16 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
             ks.records_for_usability_report(print_records=True)
 
         elif choice == "M":
+            # Mark the given key active
+            key_to_make_active = get_input("Enter key that should be made active")
+            record = ks.get_key_record(key_to_make_active)
+            if not record:
+                print(f"Did not find a record with key {key_to_make_active}")
+                continue
+            number_of_keys_updated = ks.mark_key_active(key_to_make_active)
+            print(f"{number_of_keys_updated} keys updated to active.")
+
+        elif choice == "N":
             # Mark the given key inactive and get the next available key
             key_to_make_inactive = get_input("Enter key that should be made inactive")
             record = ks.get_key_record(key_to_make_inactive)

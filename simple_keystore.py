@@ -458,6 +458,13 @@ class SimpleKeyStore:
         number_of_records_updated = self.update_key(record["id"], active=False)
 
         return number_of_records_updated
+    
+    def mark_key_active(self, unencrypted_key: str) -> int:
+        """Mark the given key active."""
+        record = self.get_key_record(unencrypted_key)
+        number_of_records_updated = self.update_key(record["id"], active=True)
+
+        return number_of_records_updated
 
     def get_sets_of_records_with_counts(self, records: List[Dict]):
         """Return a list of the record sets with their counts. Each set of records share name, source, login and batch."""
