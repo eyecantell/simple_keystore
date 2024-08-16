@@ -6,7 +6,7 @@ import os
 
 
 def show_records(ks: SimpleKeyStore, records: List):
-    headers = ["id", "name"] + ks.set_defining_fields + ["expiration_date", "expired", "usable", "key"]
+    headers = ["id"] + ks.set_defining_fields + ["expiration_date", "expired", "usable", "key"]
     print(ks.tabulate_records(records, headers))
 
 
