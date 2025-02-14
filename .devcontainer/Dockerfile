@@ -3,22 +3,23 @@
 # Use a base image with Python already installed
 FROM python:3.10-slim
 
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    postgresql \
+    sudo \
+    tree \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install pip and the non-required development libraries
-RUN python -m ensurepip --default-pip
-RUN pip install --upgrade pip
+# Install pip if it's not already installed
+RUN python -m ensurepip --default-pip && \
+    pip install --no-cache-dir --upgrade pip
 RUN pip install pdm
 RUN pip install --upgrade ruff
 RUN pip install GitPython
 RUN pip install pytest
-
-
-# Install git
-RUN apt-get -y update
-RUN apt-get -y install git
-
-# Install curl
-RUN apt-get -y install curl
-RUN apt-get -y install tree
 
 # Add .local/bin to PATH
 ENV PATH=/home/developer/.local/bin:$PATH
@@ -27,7 +28,7 @@ ENV PATH=/home/developer/.local/bin:$PATH
 WORKDIR /workspace/simple_keystore
 
 # Install the Python dependencies listed in the requirements.txt file  
-COPY ../requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Create the developer user
