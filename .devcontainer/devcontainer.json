@@ -10,8 +10,8 @@
     "mounts": [
       {
         "type": "bind",
-        "source": "${localEnv:HOME}/.netrc",
-        "target": "/home/developer/.netrc"
+        "source": "${localEnv:HOME}${localEnv:USERPROFILE}",
+        "target": "/home/developer/"
       }
     ],
     "customizations": {

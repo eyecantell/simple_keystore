@@ -5,7 +5,7 @@ FROM python:3.10-slim
 
 # Install pip and the non-required development libraries
 RUN python -m ensurepip --default-pip
-RUN pip install --upgrade pip 
+RUN pip install --upgrade pip
 RUN pip install pdm
 RUN pip install --upgrade ruff
 RUN pip install GitPython
