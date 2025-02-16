@@ -1,6 +1,6 @@
 {
     "name": "simple_keystore development environment",
-    "postCreateCommand": "pdm add --dev -e . && python ./scripts/copy_stuff_for_containers_home.py",
+    "postCreateCommand": "cd /mounted/dev/simple_keystore && pwd && pdm add --dev -e . && python ./scripts/copy_stuff_for_containers_home.py",
     
     "build": {
       "dockerfile": "Dockerfile",

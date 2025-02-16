@@ -8,11 +8,6 @@
 FROM python:3.10-slim AS base
 
 # Combined apt call to minimize number of layers
-# Update apt
-# build-essentials for gcc
-# Install java runtime env for Tika
-# Install Tesseract for OCR in Tika 
-# Install git, curl, tree
 RUN apt-get update && apt-get install -y \
     curl \
     git \
