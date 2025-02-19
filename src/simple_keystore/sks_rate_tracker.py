@@ -42,18 +42,17 @@ class SKSRateTracker:
             else:
                 raise RuntimeError(f"Cannot find key usage database {db_config=}")
         
-        # Open a connection to the key_usage_v1 database
-        self.conn = psycopg.connect(**db_config)
+        # Open a connection to the key_usage_v1 database with autocommit=True for DDL operations
+        self.conn = psycopg.connect(**db_config, autocommit=True)
         
-        #print(f"{self.conn=}")
-
         # Create the tracking table if it doesn't exist
         self._create_key_usage_table()
+        
+        # After table creation, set autocommit back to False for normal operations
+        self.conn.autocommit = False
 
         # Set the rate limit with the passed values
         self.set_rate_limit(number_of_uses_allowed, amount_of_time)
-
-        #print(f"{self=}")
 
 
     def create_db(self, db_config: dict = None):
@@ -91,7 +90,7 @@ class SKSRateTracker:
 
     def __del__(self):
         """Close the database connection when the object is destroyed."""
-        if self.conn:
+        if hasattr(self, 'conn') and self.conn:
             self.conn.close()
 
     @contextmanager
@@ -114,9 +113,9 @@ class SKSRateTracker:
         CREATE INDEX IF NOT EXISTS idx_key_usage_time 
         ON key_usage_v1 (api_key_id, used_at DESC);
         """
-        with self._get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(create_table_sql)
+        with self.conn.cursor() as cur:
+            cur.execute(create_table_sql)
+            # No need for commit as autocommit=True during table creation
         print("Created key_usage_v1 table")
 
     def set_rate_limit(self, number_of_uses_allowed: int, amount_of_time: timedelta):
@@ -129,8 +128,11 @@ class SKSRateTracker:
         self.rate_limit_timedelta = amount_of_time
         self.rate_limit_uses_allowed = number_of_uses_allowed
 
-    def add_use(self, time_used: datetime = datetime.now(timezone.utc), retries: int = 3, delay: float = 0.1):
+    def add_use(self, time_used: datetime = None, retries: int = 3, delay: float = 0.1):
         """Add a usage instance of this key if there are uses remaining."""
+        if time_used is None:
+            time_used = datetime.now(timezone.utc)
+            
         if not self.has_uses_remaining():
             raise RuntimeError(f"KeyRateError: Out of uses for key {self.api_key_id}")
 
@@ -143,15 +145,15 @@ class SKSRateTracker:
         
         for attempt in range(retries):
             try:
-                with self._get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute(insert_sql, (self.api_key_id, time_used))
+                with self.conn.cursor() as cur:
+                    cur.execute(insert_sql, (self.api_key_id, time_used))
+                # Commit the insert
+                self.conn.commit()
                 return  # Exit the method if the insert is successful
             
             except Exception as e:
-
-                 # Rollback the transaction since there was an error
-                conn.rollback()
+                # Rollback the transaction since there was an error
+                self.conn.rollback()
 
                 if attempt < retries - 1:  # not the last attempt
                     sleep(delay)  # Wait before retrying
@@ -179,10 +181,9 @@ class SKSRateTracker:
         """
         window_start = datetime.now(timezone.utc) - self.rate_limit_timedelta
         
-        with self._get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(count_sql, (self.api_key_id, window_start))
-                current_uses = cur.fetchone()[0]
+        with self.conn.cursor() as cur:
+            cur.execute(count_sql, (self.api_key_id, window_start))
+            current_uses = cur.fetchone()[0]
                 
         return max(0, self.rate_limit_uses_allowed - current_uses)
 
@@ -198,6 +199,6 @@ class SKSRateTracker:
         """
         threshold = datetime.now(timezone.utc) - age_as_timedelta
         
-        with self._get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(cleanup_sql, (self.api_key_id, threshold))
+        with self.conn.cursor() as cur:
+            cur.execute(cleanup_sql, (self.api_key_id, threshold))
+        self.conn.commit()
