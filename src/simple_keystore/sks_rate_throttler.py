@@ -20,6 +20,39 @@ class SKSRateThrottler:
         self.rate_limit_uses_allowed = None
         self.set_rate_limit(number_of_uses_allowed, amount_of_time)
 
+        # Load the Lua script
+        lua_increment_script = """
+        local redis_key = KEYS[1]
+        local current_time = ARGV[1]
+        local window_start = ARGV[2]
+        local max_uses = tonumber(ARGV[3])
+        local window_duration_in_sec = tonumber(ARGV[4])
+
+        redis.call("ZREMRANGEBYSCORE", redis_key, 0, window_start)
+        local current_count = redis.call("ZCARD", redis_key)
+
+        local can_increment = current_count < max_uses
+
+        if can_increment then
+            redis.call("ZADD", redis_key, current_time, current_time)
+        else
+            local exists = redis.call("EXISTS", redis_key)
+            if exists == 1 then
+                redis.call("EXPIRE", redis_key, math.ceil(window_duration_in_sec))
+            end
+            return 0
+        end
+
+        redis.call("EXPIRE", redis_key, math.ceil(window_duration_in_sec))
+
+        return 1
+        """
+ 
+        try:
+            self.lua_increment_script_sha = self.redis.script_load(lua_increment_script) # Get the script SHA for faster execution
+        except Exception as e:
+            raise RuntimeError(f"Failed to load Lua script: {e}")
+
     def set_rate_limit(self, number_of_uses_allowed: int, amount_of_time: timedelta):
         """Set our rate limit values."""
         if number_of_uses_allowed <= 0:
@@ -30,73 +63,35 @@ class SKSRateThrottler:
         self.rate_limit_timedelta = amount_of_time
         self.rate_limit_uses_allowed = number_of_uses_allowed
 
-    def is_rate_limited(self) -> tuple[bool, bool]:
+    def is_rate_limited(self) -> bool:
         """
         Check if the API key is rate limited and atomically attempt to register a new request.
-        Returns a tuple (is_limited, was_incremented):
-        - is_limited: True if the client is rate limited (even after trying to increment).
-        - was_incremented: True if a new request was successfully added, False otherwise.
+        Returns True if the client is rate limited (no increment occurred), False otherwise (increment occurred).
         """
         current_time = int(time.time())
         window_start = current_time - self.rate_limit_timedelta.total_seconds()
+        window_duration = self.rate_limit_timedelta.total_seconds()
 
-        # Use a Redis pipeline with transactions for atomicity
-        pipe = self.redis.pipeline()
-        redis_key = f"ratelimit:{self.api_key_id}"
+        # Execute the Lua script
+        was_incremented = self.redis.evalsha(
+            self.lua_increment_script_sha,
+            1,  # Number of keys
+            f"ratelimit:{self.api_key_id}",  # Key 1
+            str(current_time),  # Arg 1: current timestamp
+            str(window_start),  # Arg 2: window start time
+            str(self.rate_limit_uses_allowed),  # Arg 3: max uses allowed
+            str(window_duration)  # Arg 4: window duration in seconds
+        )
 
-        # Start a transaction
-        pipe.multi()
+        # Lua returns 1 for success (incremented) and 0 for failure (rate-limited)
+        return not bool(was_incremented)  # Return True if rate-limited, False if not
 
-        # Queue commands to clean old entries and check current count
-        pipe.zremrangebyscore(redis_key, 0, window_start)
-        pipe.zcard(redis_key)
-
-        # Queue the potential new timestamp (we'll decide later if it stays)
-        pipe.zadd(redis_key, {str(current_time): current_time})
-
-        # Queue the expiration
-        pipe.expire(redis_key, self.rate_limit_timedelta.total_seconds())
-
-        # Execute the transaction atomically
-        results = pipe.execute()
-
-        # Extract results
-        num_removed = results[0]  # Result of zremrangebyscore
-        current_count_before = results[1]  # Result of zcard (before potential add)
-        zadd_result = results[2]  # Result of zadd (1 if added, 0 if not, but we’ll use logic)
-
-        # Determine if we were rate limited
-        is_limited = current_count_before >= self.rate_limit_uses_allowed
-
-        # Determine if we successfully incremented
-        # If we were already at or over the limit, the zadd shouldn't "count," but in this setup, it did add.
-        # We need to correct this by removing the timestamp if we were limited.
-
-        was_incremented = not is_limited  # Assume we incremented only if not limited
-
-        if is_limited:
-            # If we were limited, remove the timestamp we just added
-            self.redis.zrem(redis_key, str(current_time))
-            # Ensure expiration is still set
-            self.redis.expire(redis_key, self.rate_limit_timedelta.total_seconds())
-        else:
-            # If not limited, the timestamp stays, and we're good
-            pass
-
-        return is_limited, was_incremented
-
-    
     def wait_until_available(self, timeout: int = 3600):
         """Block until the API key is available for use or timeout occurs."""
         start_time = time.time()
-        wait_time = 1  # Initial wait time in seconds
-
-        while True:
-            is_limited, was_incremented = self.is_rate_limited()
-            if not is_limited and was_incremented:
-                # We successfully claimed a slot, proceed
-                return
+        wait_time_in_seconds = 1
+        while self.is_rate_limited():
             if time.time() - start_time >= timeout:
                 raise TimeoutError(f"API key {self.api_key_id=} is still rate limited after the timeout period of {timeout}s")
-            time.sleep(wait_time)
-            wait_time = min(wait_time * 1.5, 60)  # Exponential backoff, cap at 60 seconds
+            time.sleep(min(wait_time_in_seconds, 120)) # cap wait time to 120 seconds
+            wait_time_in_seconds *= 1.5

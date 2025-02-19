@@ -4,18 +4,17 @@ This is a simple key storage solution for development or on-prem use. Use secret
 
 Uses an SQLite database to store/retrieve encrypted keys with metadata including expiration dates. 
 
-Uses PostgreSQL to track key usage.
+Uses Redis to throttle key usage.
 
-There is a Dockerfile and .devcontainer for use with VSCode. 
+There is a Dockerfile included, and .devcontainer for use with VSCode. 
 
 ## Requirements
 
-If you are going to use the key usage / rate tracking (SKSRateTracker), you will need PostgreSQL. This is not necessary if just using SimpleKeystore.
+If you are going to use the throttler (SKSRateThrottler), you will need Redis. This is not necessary if just using SimpleKeystore.
 
 ```bash
-sudo apt-get install -y postgresql
-sudo service postgresql start 
-sudo systemctl enable postgresql # If you want it to start on boot
+sudo apt-get install -y redis-server
+sudo service redis-server start 
 ```
 
 ## Installation
