@@ -2,12 +2,12 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from time import sleep
 from typing import Optional
-import base64
-import os
 import psycopg
 
-
 class SKSRateTracker:
+
+    KEY_USAGE_TABLE_NAME = "key_usage_v1"
+
     def __init__(
         self,
         api_key_id: int,
@@ -33,9 +33,9 @@ class SKSRateTracker:
         if db_config is None:
             db_config = {
                 "host": "postgres",  # Service name
-                "dbname": "key_usage_v1",  # Database name
-                "user": "postgres",  # PostgreSQL default user
-                "password": base64.b64decode(os.getenv("POSTGRES_PASSWORD")).decode("utf-8"),  # Decode the secret
+                "dbname": "key_rate_db",  # Database name
+                "user": "developer",
+                "password": "developer",
             }
 
         self.db_config = db_config
@@ -49,7 +49,7 @@ class SKSRateTracker:
             else:
                 raise RuntimeError(f"Cannot find key usage database {db_config=}")
 
-        # Open a connection to the key_usage_v1 database with autocommit=True for DDL operations
+        # Open a connection to the database with autocommit=True for DDL operations
         self.conn = psycopg.connect(**db_config, autocommit=True)
 
         # Create the tracking table if it doesn't exist
@@ -111,21 +111,21 @@ class SKSRateTracker:
             raise e
 
     def _create_key_usage_table(self):
-        """Create the key_usage_v1 table if it doesn't exist."""
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS key_usage_v1 (
+        """Create the KEY_USAGE_TABLE_NAME table if it doesn't exist."""
+        create_table_sql = f"""
+        CREATE TABLE IF NOT EXISTS {self.KEY_USAGE_TABLE_NAME} (
             api_key_id INTEGER NOT NULL,
             used_at TIMESTAMP WITH TIME ZONE NOT NULL,
-            requestor VARCHAR(255),
+            requestor VARCHAR(63),
             PRIMARY KEY (api_key_id, used_at)
         );
         CREATE INDEX IF NOT EXISTS idx_key_usage_time 
-        ON key_usage_v1 (api_key_id, used_at DESC);
+        ON {self.KEY_USAGE_TABLE_NAME} (api_key_id, used_at DESC);
         """
         with self.conn.cursor() as cur:
             cur.execute(create_table_sql)
             # No need for commit as autocommit=True during table creation
-        print("Created key_usage_v1 table")
+        print(f"Created {self.KEY_USAGE_TABLE_NAME} table")
 
     def set_rate_limit(self, number_of_uses_allowed: int, amount_of_time: timedelta):
         """Set the rate limit values for this key."""
@@ -147,8 +147,8 @@ class SKSRateTracker:
 
         print(f"orig {time_used=}")
 
-        insert_sql = """
-        INSERT INTO key_usage_v1 (api_key_id, used_at)
+        insert_sql = f"""
+        INSERT INTO {self.KEY_USAGE_TABLE_NAME} (api_key_id, used_at)
         VALUES (%s, %s);
         """
 
@@ -182,9 +182,9 @@ class SKSRateTracker:
         if self.rate_limit_timedelta is None:
             raise RuntimeError("Rate limit not set")
 
-        count_sql = """
+        count_sql = f"""
         SELECT COUNT(*) 
-        FROM key_usage_v1 
+        FROM {self.KEY_USAGE_TABLE_NAME} 
         WHERE api_key_id = %s 
         AND used_at > %s;
         """
@@ -201,8 +201,8 @@ class SKSRateTracker:
         if age_as_timedelta <= timedelta():
             raise ValueError("Cleanup age must be positive")
 
-        cleanup_sql = """
-        DELETE FROM key_usage_v1 
+        cleanup_sql = f"""
+        DELETE FROM {self.KEY_USAGE_TABLE_NAME} 
         WHERE api_key_id = %s 
         AND used_at < %s;
         """
