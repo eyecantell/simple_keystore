@@ -2,17 +2,18 @@ from datetime import datetime, timedelta
 import time
 import redis
 
+
 class SKSRateThrottler:
-    '''Use Redis to throttle the number of API requests in a rolling window'''
+    """Use Redis to throttle the number of API requests in a rolling window"""
 
     def __init__(
         self,
         api_key_id: int,
         number_of_uses_allowed: int,
         amount_of_time: timedelta,
-        redis_host: str = "localhost", 
+        redis_host: str = "localhost",
         redis_port: int = 6379,
-        redis_db: int = 0
+        redis_db: int = 0,
     ):
         self.redis = redis.Redis(host=redis_host, port=redis_port, db=redis_db)
         self.api_key_id = api_key_id
@@ -47,9 +48,11 @@ class SKSRateThrottler:
 
         return 1
         """
- 
+
         try:
-            self.lua_increment_script_sha = self.redis.script_load(lua_increment_script) # Get the script SHA for faster execution
+            self.lua_increment_script_sha = self.redis.script_load(
+                lua_increment_script
+            )  # Get the script SHA for faster execution
         except Exception as e:
             raise RuntimeError(f"Failed to load Lua script: {e}")
 
@@ -80,7 +83,7 @@ class SKSRateThrottler:
             str(current_time),  # Arg 1: current timestamp
             str(window_start),  # Arg 2: window start time
             str(self.rate_limit_uses_allowed),  # Arg 3: max uses allowed
-            str(window_duration)  # Arg 4: window duration in seconds
+            str(window_duration),  # Arg 4: window duration in seconds
         )
 
         # Lua returns 1 for success (incremented) and 0 for failure (rate-limited)
@@ -92,6 +95,8 @@ class SKSRateThrottler:
         wait_time_in_seconds = 1
         while self.is_rate_limited():
             if time.time() - start_time >= timeout:
-                raise TimeoutError(f"API key {self.api_key_id=} is still rate limited after the timeout period of {timeout}s")
-            time.sleep(min(wait_time_in_seconds, 120)) # cap wait time to 120 seconds
+                raise TimeoutError(
+                    f"API key {self.api_key_id=} is still rate limited after the timeout period of {timeout}s"
+                )
+            time.sleep(min(wait_time_in_seconds, 120))  # cap wait time to 120 seconds
             wait_time_in_seconds *= 1.5
