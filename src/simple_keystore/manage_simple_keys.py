@@ -177,5 +177,6 @@ def main():
     ks = SimpleKeyStore(args.keystore_db)
     manage_keys(ks)
 
+
 if __name__ == "__main__":
     main()

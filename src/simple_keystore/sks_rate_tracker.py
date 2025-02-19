@@ -6,11 +6,18 @@ import base64
 import os
 import psycopg
 
+
 class SKSRateTracker:
-    def __init__(self, api_key_id: int, number_of_uses_allowed: int, amount_of_time: timedelta, 
-                 db_config: Optional[dict] = None, create_db_if_dne: bool = False):
+    def __init__(
+        self,
+        api_key_id: int,
+        number_of_uses_allowed: int,
+        amount_of_time: timedelta,
+        db_config: Optional[dict] = None,
+        create_db_if_dne: bool = False,
+    ):
         """Initialize the rate tracker with a key ID and rate limit settings.
-        
+
         Args:
             api_key_id: The ID of the key to track
             number_of_uses_allowed: Maximum number of uses allowed in the time period
@@ -21,14 +28,14 @@ class SKSRateTracker:
         self.api_key_id = api_key_id
         self.rate_limit_timedelta = None
         self.rate_limit_uses_allowed = None
-        
+
         # Default database configuration for Kubernetes
         if db_config is None:
             db_config = {
-                'host': 'postgres',  # Service name
-                'dbname': 'key_usage_v1',  # Database name
-                'user': 'postgres',  # PostgreSQL default user
-                'password': base64.b64decode(os.getenv('POSTGRES_PASSWORD')).decode('utf-8')  # Decode the secret
+                "host": "postgres",  # Service name
+                "dbname": "key_usage_v1",  # Database name
+                "user": "postgres",  # PostgreSQL default user
+                "password": base64.b64decode(os.getenv("POSTGRES_PASSWORD")).decode("utf-8"),  # Decode the secret
             }
 
         self.db_config = db_config
@@ -41,45 +48,47 @@ class SKSRateTracker:
                 self.create_db(db_config)
             else:
                 raise RuntimeError(f"Cannot find key usage database {db_config=}")
-        
+
         # Open a connection to the key_usage_v1 database with autocommit=True for DDL operations
         self.conn = psycopg.connect(**db_config, autocommit=True)
-        
+
         # Create the tracking table if it doesn't exist
         self._create_key_usage_table()
-        
+
         # After table creation, set autocommit back to False for normal operations
         self.conn.autocommit = False
 
         # Set the rate limit with the passed values
         self.set_rate_limit(number_of_uses_allowed, amount_of_time)
 
-
     def create_db(self, db_config: dict = None):
         """Create a new PostgreSQL key rate tracking database."""
-        if db_config is None: db_config = self.db_config
+        if db_config is None:
+            db_config = self.db_config
         admin_config = db_config.copy()
-        admin_config['dbname'] = 'postgres'  # Connect to the default 'postgres' database to create new one
+        admin_config["dbname"] = "postgres"  # Connect to the default 'postgres' database to create new one
 
         with psycopg.connect(**admin_config, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(f"CREATE DATABASE {db_config['dbname']};")
 
     def delete_db(self, db_config: dict = None):
-        if db_config is None: db_config = self.db_config
+        if db_config is None:
+            db_config = self.db_config
         admin_config = db_config.copy()
-        admin_config['dbname'] = 'postgres'
+        admin_config["dbname"] = "postgres"
         with psycopg.connect(**admin_config, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(f"DROP DATABASE IF EXISTS {db_config['dbname']};")
 
-    def db_exists(self, db_config : dict = None):
+    def db_exists(self, db_config: dict = None):
         """Check if the database exists."""
         try:
-            if db_config is None: db_config = self.db_config
+            if db_config is None:
+                db_config = self.db_config
 
             admin_config = db_config.copy()
-            admin_config['dbname'] = 'postgres'  # Connect to the default 'postgres' database to check for others
+            admin_config["dbname"] = "postgres"  # Connect to the default 'postgres' database to check for others
             with psycopg.connect(**admin_config) as conn:
                 with conn.cursor() as cur:
                     cur.execute(f"SELECT 1 FROM pg_catalog.pg_database WHERE datname = '{db_config['dbname']}';")
@@ -90,7 +99,7 @@ class SKSRateTracker:
 
     def __del__(self):
         """Close the database connection when the object is destroyed."""
-        if hasattr(self, 'conn') and self.conn:
+        if hasattr(self, "conn") and self.conn:
             self.conn.close()
 
     @contextmanager
@@ -124,7 +133,7 @@ class SKSRateTracker:
             raise ValueError("Number of uses allowed must be positive")
         if amount_of_time <= timedelta():
             raise ValueError("Amount of time must be positive")
-            
+
         self.rate_limit_timedelta = amount_of_time
         self.rate_limit_uses_allowed = number_of_uses_allowed
 
@@ -132,7 +141,7 @@ class SKSRateTracker:
         """Add a usage instance of this key if there are uses remaining."""
         if time_used is None:
             time_used = datetime.now(timezone.utc)
-            
+
         if not self.has_uses_remaining():
             raise RuntimeError(f"KeyRateError: Out of uses for key {self.api_key_id}")
 
@@ -142,7 +151,7 @@ class SKSRateTracker:
         INSERT INTO key_usage_v1 (api_key_id, used_at)
         VALUES (%s, %s);
         """
-        
+
         for attempt in range(retries):
             try:
                 with self.conn.cursor() as cur:
@@ -150,7 +159,7 @@ class SKSRateTracker:
                 # Commit the insert
                 self.conn.commit()
                 return  # Exit the method if the insert is successful
-            
+
             except Exception as e:
                 # Rollback the transaction since there was an error
                 self.conn.rollback()
@@ -172,7 +181,7 @@ class SKSRateTracker:
         """Check how many key uses are still available."""
         if self.rate_limit_timedelta is None:
             raise RuntimeError("Rate limit not set")
-            
+
         count_sql = """
         SELECT COUNT(*) 
         FROM key_usage_v1 
@@ -180,25 +189,25 @@ class SKSRateTracker:
         AND used_at > %s;
         """
         window_start = datetime.now(timezone.utc) - self.rate_limit_timedelta
-        
+
         with self.conn.cursor() as cur:
             cur.execute(count_sql, (self.api_key_id, window_start))
             current_uses = cur.fetchone()[0]
-                
+
         return max(0, self.rate_limit_uses_allowed - current_uses)
 
     def cleanup_uses(self, age_as_timedelta: timedelta = timedelta(hours=24)):
         """Remove uses that are older than age_as_timedelta."""
         if age_as_timedelta <= timedelta():
             raise ValueError("Cleanup age must be positive")
-            
+
         cleanup_sql = """
         DELETE FROM key_usage_v1 
         WHERE api_key_id = %s 
         AND used_at < %s;
         """
         threshold = datetime.now(timezone.utc) - age_as_timedelta
-        
+
         with self.conn.cursor() as cur:
             cur.execute(cleanup_sql, (self.api_key_id, threshold))
         self.conn.commit()

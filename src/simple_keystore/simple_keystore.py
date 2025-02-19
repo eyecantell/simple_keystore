@@ -15,8 +15,6 @@ class SimpleKeyStore:
         self.KEYSTORE_TABLE_NAME = "keystore"
         self.create_keystore_table_if_dne()
 
-       
-
         self.set_defining_fields = ["name", "source", "login", "batch"]
 
     def __del__(self):
@@ -460,7 +458,7 @@ class SimpleKeyStore:
         number_of_records_updated = self.update_key(record["id"], active=False)
 
         return number_of_records_updated
-    
+
     def mark_key_active(self, unencrypted_key: str) -> int:
         """Mark the given key active."""
         record = self.get_key_record(unencrypted_key)
@@ -616,5 +614,3 @@ class SimpleKeyStore:
         if record_with_min_usable_set:
             return record_with_min_usable_set.get("key")
         return None
-
-    
