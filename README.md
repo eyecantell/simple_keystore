@@ -23,7 +23,7 @@ pip install simple_keystore
 ```
 ## Usage
 
-You can set the encryption key either via environment variable or as an entry in your .netrc where the password is the key.
+You can set the encryption key either via environment variable or as an entry in your .netrc where the password is the key and machine is SIMPLE_KEYSTORE_KEY
 
 ```bash
 export SIMPLE_KEYSTORE_KEY = "myencryptionkeyphrase"
