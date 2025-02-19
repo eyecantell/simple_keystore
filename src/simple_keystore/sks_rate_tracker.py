@@ -17,24 +17,30 @@ class SKSRateTracker:
             db_config: Database connection configuration
         """
         self.key_id = key_id
-        self.rate_limit_timedelta: Optional[timedelta] = None
-        self.rate_limit_uses_allowed: Optional[int] = None
+        self.rate_limit_timedelta: timedelta = None
+        self.rate_limit_uses_allowed: int = None
         
         # Default database configuration for Kubernetes
         if db_config is None:
             db_config = {
                 'host': 'postgres',  # Service name
-                'database': 'key_usage_v1',  # Database name
+                'dbname': 'key_usage_v1',  # Database name
                 'user': 'postgres',  # PostgreSQL default user
                 'password': base64.b64decode(os.getenv('POSTGRES_PASSWORD')).decode('utf-8')  # Decode the secret
             }
 
+        print(f"{db_config=}")
+
         # Open a connection to the key_usage database
         self.conn = psycopg.connect(**db_config)
         
+        print(f"{self.conn=}")
+
         # Create the tracking table if it doesn't exist
         self._create_table()
         self.set_rate_limit(number_of_uses_allowed, amount_of_time)
+
+        print(f"{self=}")
 
     def __del__(self):
         """Close the database connection when the object is destroyed."""
