@@ -4,8 +4,8 @@ from time import sleep
 from typing import Optional
 import psycopg
 
-class SKSRateTracker:
 
+class SKSRateTracker:
     KEY_USAGE_TABLE_NAME = "key_usage_v1"
 
     def __init__(
