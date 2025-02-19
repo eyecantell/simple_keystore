@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from simple_keystore import SKSRateTracker
 from time import sleep
 from typing import Optional
-from uuid import uuid4
+from uuid import uuid4, UUID
 import psycopg
 
 
@@ -16,6 +16,8 @@ class SKSRateThrottler:
         amount_of_time: timedelta,
         db_config: Optional[dict] = None,
         create_db_if_dne: bool = False,
+        requestor_name: str = None,
+        requestor_uuid: UUID = None,
     ):
         """Initialize the rate throttler with a key ID and rate limit settings."""
 
@@ -34,7 +36,10 @@ class SKSRateThrottler:
 
         # Open a connection to the database with autocommit=True for DDL operations
         self.conn = psycopg.connect(**self.db_config, autocommit=True)
-        self.uuid = uuid4()  # Will be used to differentiate requests from among different throttler instances
+        self.requestor_name = requestor_name
+        self.requestor_uuid: UUID = (
+            requestor_uuid or uuid4()
+        )  # Will be used to differentiate requests from among different throttler instances
 
     def _create_use_requests_table(self):
         """Create the USE_REQUESTS_TABLE_NAME table if it doesn't exist."""
@@ -42,33 +47,38 @@ class SKSRateThrottler:
         CREATE TABLE IF NOT EXISTS {self.USE_REQUESTS_TABLE_NAME} (
             api_key_id INTEGER NOT NULL,
             requested_at TIMESTAMP WITH TIME ZONE NOT NULL,
-            requestor VARCHAR(63),
+            requestor_name VARCHAR(63),
             requestor_uuid VARCHAR(63),
-            PRIMARY KEY (api_key_id, requested_at)
+            PRIMARY KEY (api_key_id, requested_at, requestor_uuid)
         );
         CREATE INDEX IF NOT EXISTS idx_key_usage_time
-        ON {self.USE_REQUESTS_TABLE_NAME} (api_key_id, requested_at DESC);
+        ON {self.USE_REQUESTS_TABLE_NAME} (api_key_id, requested_at, requestor_uuid);
         """
         with self.conn.cursor() as cur:
             cur.execute(create_table_sql)
             # No need for commit as autocommit=True during table creation
         print(f"Created {self.USE_REQUESTS_TABLE_NAME=} table")
 
-    def add_use_request(self, retries: int = 3, delay: float = 0.1):
+    def add_use_request(self, requestor_name: str = None, retries: int = 3, delay: float = 0.1):
         """Add a key usage request"""
-        time_requested = datetime.now(timezone.utc)
 
+        time_requested = datetime.now(timezone.utc)
         print(f"orig {time_requested=}")
 
+        if requestor_name is None:
+            requestor_name = self.requestor_name
+
         insert_sql = f"""
-        INSERT INTO {self.USE_REQUESTS_TABLE_NAME} (api_key_id, used_at)
-        VALUES (%s, %s);
+        INSERT INTO {self.USE_REQUESTS_TABLE_NAME} (api_key_id, requested_at, requestor_name, requestor_uuid)
+        VALUES (%s, %s, %s, %s);
         """
 
         for attempt in range(retries):
             try:
                 with self.conn.cursor() as cur:
-                    cur.execute(insert_sql, (self.tracker.api_key_id, time_requested))
+                    cur.execute(
+                        insert_sql, (self.tracker.api_key_id, time_requested, requestor_name, self.requestor_uuid)
+                    )
                 # Commit the insert
                 self.conn.commit()
                 return  # Exit the method if the insert is successful
