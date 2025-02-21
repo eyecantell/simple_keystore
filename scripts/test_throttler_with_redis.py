@@ -1,13 +1,10 @@
 from datetime import timedelta
 from simple_keystore import SKSRateThrottler
 
+
 def test_rate_throttler():
     # Initialize the throttler with an API key ID, 5 uses allowed in 10 seconds
-    throttler = SKSRateThrottler(
-        api_key_id=1,
-        number_of_uses_allowed=5,
-        amount_of_time=timedelta(seconds=5)
-    )
+    throttler = SKSRateThrottler(api_key_id=1, number_of_uses_allowed=5, amount_of_time=timedelta(seconds=5))
 
     print("Starting test...")
 
@@ -20,15 +17,15 @@ def test_rate_throttler():
     expected_remaining = throttler.rate_limit_uses_allowed
     for i in range(throttler.rate_limit_uses_allowed + 3):  # Try more times than allowed to see throttling
         remaining, claimed = throttler.remaining_uses(claim_slot=True)
-        print(f"Attempt {i+1}: Remaining uses: {remaining}, Slot claimed: {claimed}")
+        print(f"Attempt {i + 1}: Remaining uses: {remaining}, Slot claimed: {claimed}")
         expected_remaining -= 1
-        assert remaining == max(0, expected_remaining), f"Expected {max(0, expected_remaining)} after {throttler.rate_limit_uses_allowed - expected_remaining} uses, but got {remaining}"
+        assert remaining == max(0, expected_remaining), (
+            f"Expected {max(0, expected_remaining)} after {throttler.rate_limit_uses_allowed - expected_remaining} uses, but got {remaining}"
+        )
         if expected_remaining >= 0:
             assert claimed == True, f"Expected claimed to be True when expected_remaining is {expected_remaining}"
         else:
             assert claimed == False, f"Expected claimed to be False when expected_remaining is zero"
-
-        
 
     # Test 3: Wait until a slot is available
     print("\nWaiting for a slot to become available...")
@@ -41,6 +38,7 @@ def test_rate_throttler():
     key = "ratelimit:1"
     timestamps = redis_client.zrange(key, 0, -1, withscores=True)
     print(f"Timestamps in Redis for key {key}: {timestamps}")
+
 
 if __name__ == "__main__":
     test_rate_throttler()

@@ -4,6 +4,7 @@ import redis
 import time
 import uuid
 
+
 class SKSRateThrottler:
     def __init__(
         self,
@@ -70,17 +71,16 @@ class SKSRateThrottler:
         self.rate_limit_timedelta = amount_of_time
         self.rate_limit_uses_allowed = number_of_uses_allowed
 
-
     def remaining_uses(self, claim_slot: bool = False) -> Tuple[int, bool]:
         """Check if the API key is rate limited and optionally claim a use.
         Returns (remaining: int, slot_claimed: bool)."""
         current_time = int(time.time())
         window_start = current_time - self.rate_limit_timedelta.total_seconds()
         window_duration = self.rate_limit_timedelta.total_seconds()
-        
+
         # Generate a unique request ID
         request_id = str(uuid.uuid4())
-        
+
         try:
             remaining, slot_claimed = self.redis.evalsha(
                 self.lua_increment_script_sha,
@@ -118,9 +118,7 @@ class SKSRateThrottler:
                     return remaining
                 elapsed = time.time() - start_time
                 if elapsed >= timeout:
-                    raise TimeoutError(
-                        f"API key {self.api_key_id} still unavailable after {timeout}s"
-                    )
+                    raise TimeoutError(f"API key {self.api_key_id} still unavailable after {timeout}s")
                 if verbose:
                     print(
                         f"Waiting for key {self.api_key_id} - "
