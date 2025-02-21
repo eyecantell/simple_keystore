@@ -23,7 +23,7 @@ def test_rate_throttler():
         print(f"Attempt {i+1}: Remaining uses: {remaining}, Slot claimed: {claimed}")
         expected_remaining -= 1
         assert remaining == max(0, expected_remaining), f"Expected {max(0, expected_remaining)} after {throttler.rate_limit_uses_allowed - expected_remaining} uses, but got {remaining}"
-        if expected_remaining > 0:
+        if expected_remaining >= 0:
             assert claimed == True, f"Expected claimed to be True when expected_remaining is {expected_remaining}"
         else:
             assert claimed == False, f"Expected claimed to be False when expected_remaining is zero"

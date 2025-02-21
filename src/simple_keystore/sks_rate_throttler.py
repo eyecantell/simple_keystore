@@ -2,6 +2,7 @@ from datetime import timedelta
 from typing import Optional, Tuple
 import redis
 import time
+import uuid
 
 class SKSRateThrottler:
     def __init__(
@@ -22,7 +23,7 @@ class SKSRateThrottler:
         self.api_key_id = api_key_id
         self._set_rate_limit(number_of_uses_allowed, amount_of_time)
 
-        # Load the Lua script
+        # Load the Lua script with unique member handling
         lua_increment_script = """
         -- KEYS[1] - rate limit key
         -- ARGV[1] - current timestamp
@@ -30,17 +31,25 @@ class SKSRateThrottler:
         -- ARGV[3] - max requests allowed
         -- ARGV[4] - window size in seconds
         -- ARGV[5] - claim_slot (string "true" or "false")
+        -- ARGV[6] - unique request id
         local key = KEYS[1]
         local current_time = tonumber(ARGV[1])
         local window_start = tonumber(ARGV[2])
         local max_requests = tonumber(ARGV[3])
         local window_size = tonumber(ARGV[4])
         local claim_slot = (ARGV[5] == "true")
+        local request_id = ARGV[6]
+        
+        -- Remove expired entries
         redis.call('ZREMRANGEBYSCORE', key, '-inf', window_start)
+        
+        -- Count current entries in window
         local current_count = redis.call('ZCARD', key)
         local remaining = max_requests - current_count
+        
         if claim_slot and remaining > 0 then
-            redis.call('ZADD', key, current_time, current_time)
+            -- Use unique identifier as member to prevent overwriting
+            redis.call('ZADD', key, current_time, request_id .. ':' .. current_time)
             redis.call('EXPIRE', key, window_size)
             return {remaining - 1, true}
         else
@@ -51,7 +60,6 @@ class SKSRateThrottler:
             self.lua_increment_script_sha = self.redis.script_load(lua_increment_script)
         except Exception as e:
             raise RuntimeError(f"Failed to load Lua script: {e}")
-
 
     def _set_rate_limit(self, number_of_uses_allowed: int, amount_of_time: timedelta):
         """Set rate limit values (internal use)."""
@@ -68,6 +76,10 @@ class SKSRateThrottler:
         current_time = int(time.time())
         window_start = current_time - self.rate_limit_timedelta.total_seconds()
         window_duration = self.rate_limit_timedelta.total_seconds()
+        
+        # Generate a unique request ID
+        request_id = str(uuid.uuid4())
+        
         try:
             remaining, slot_claimed = self.redis.evalsha(
                 self.lua_increment_script_sha,
@@ -78,6 +90,7 @@ class SKSRateThrottler:
                 str(self.rate_limit_uses_allowed),
                 str(window_duration),
                 str(claim_slot).lower(),
+                request_id,
             )
             return (int(remaining), bool(slot_claimed))
         except Exception as e:
