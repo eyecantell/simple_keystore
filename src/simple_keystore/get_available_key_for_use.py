@@ -1,13 +1,15 @@
-from simple_keystore import SimpleKeyStore, SKSRateThrottler
 from datetime import timedelta
 import time
 import logging
-from typing import Optional
+from simple_keystore import SimpleKeyStore, SKSRateThrottler
 
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,  # Default level
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
-
-DEFAULT_TIMEOUT_SECONDS = 3600
-
 
 def get_available_key_for_use(
     key_name: str,
@@ -16,8 +18,7 @@ def get_available_key_for_use(
     key_use_window_in_seconds: int,
     redis_host: str,
     redis_port: int,
-    how_long_to_try_in_seconds: int = DEFAULT_TIMEOUT_SECONDS,
-    verbose: bool = False,
+    how_long_to_try_in_seconds: int = 3600,
 ) -> str:
     """Returns the first available key string matching key_name that is active, not expired, and has usage slots available.
 
@@ -53,52 +54,45 @@ def get_available_key_for_use(
     while True:
         try:
             key_record_to_use = _attempt_to_grab_a_slot_from_available_keys(
-                key_name=key_name, keystore=keystore, throttler=throttler, verbose=verbose
+                key_name=key_name, keystore=keystore, throttler=throttler
             )
             if key_record_to_use:
-                if verbose:
-                    logger.debug(f"Found available key: {key_record_to_use}")
+                logger.debug(f"Found available key: {key_record_to_use}")
                 return key_record_to_use["key"]
 
             elapsed = time.time() - start_time
             if elapsed >= how_long_to_try_in_seconds:
+                logger.error(f"No {key_name} keys available after {how_long_to_try_in_seconds}s")
                 raise TimeoutError(f"No {key_name} keys available after {how_long_to_try_in_seconds}s")
 
-            if verbose:
-                logger.debug(f"No keys available. Retrying in {wait_time_in_seconds:.1f}s")
+            logger.info(f"No keys available. Retrying in {wait_time_in_seconds:.1f}s")
             time.sleep(min(wait_time_in_seconds, 180))
             wait_time_in_seconds *= 1.5
 
         except TimeoutError:
             raise
-        except ConnectionError as e:
-            if verbose:
-                logger.error(f"Connection error: {str(e)}")
-            raise
         except Exception as e:
-            if verbose:
-                logger.error(f"Unexpected error: {str(e)}")
+            logger.error(f"Error: {str(e)}")
             raise
-
 
 def _attempt_to_grab_a_slot_from_available_keys(
-    key_name: str, keystore: SimpleKeyStore, throttler: SKSRateThrottler, verbose: bool = False
-) -> Optional[dict]:
+    key_name: str, keystore: SimpleKeyStore, throttler: SKSRateThrottler
+) -> dict | None:
     """Attempts to claim a usage slot for a key from the keystore. Returns the first successful key record or None."""
     matching_records = keystore.get_matching_key_records(name=key_name, active=True)
 
     for key_record in matching_records:
         if not key_record["usable"]:
+            logger.debug(f"Skipping unusable key {key_name} id {key_record['id']}")
             continue
 
         throttler.api_key_id = key_record["id"]
         remaining, slot_claimed = throttler.remaining_uses(claim_slot=True)
 
         if slot_claimed:
-            if verbose:
-                logger.debug(f"Claimed slot for key {key_name} id {key_record['id']} ({remaining} uses left)")
+            logger.debug(f"Claimed slot for key {key_name} id {key_record['id']} ({remaining} uses left)")
             return key_record
-        elif verbose:
+        else:
             logger.debug(f"Key {key_name} id {key_record['id']} has {remaining} uses left - trying next")
 
     return None
