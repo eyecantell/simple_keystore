@@ -11,6 +11,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 def get_available_key_for_use(
     key_name: str,
     keystore: SimpleKeyStore,
@@ -74,6 +75,7 @@ def get_available_key_for_use(
         except Exception as e:
             logger.error(f"Error: {str(e)}")
             raise
+
 
 def _attempt_to_grab_a_slot_from_available_keys(
     key_name: str, keystore: SimpleKeyStore, throttler: SKSRateThrottler

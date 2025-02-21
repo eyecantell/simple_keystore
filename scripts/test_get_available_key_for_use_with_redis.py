@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 REDIS_HOST = "localhost"
 REDIS_PORT = 6379
 
+
 def test_get_available_key_for_use():
     """Test function to verify the behavior of get_available_key_for_use with Redis."""
     # Setup
@@ -58,8 +59,8 @@ def test_get_available_key_for_use():
     # One slot for key1 was claimed above via get_available_key_for_use, exhaust the two remaining
     for i in range(2):
         remaining, claimed = throttler.remaining_uses(claim_slot=True)
-        assert claimed, f"Failed to claim slot {i+2} for key1, remaining: {remaining}"
-        logger.debug(f"Claimed slot {i+2} for key1, remaining: {remaining}")
+        assert claimed, f"Failed to claim slot {i + 2} for key1, remaining: {remaining}"
+        logger.debug(f"Claimed slot {i + 2} for key1, remaining: {remaining}")
 
     result = get_available_key_for_use(
         key_name=key_name,
@@ -89,7 +90,6 @@ def test_get_available_key_for_use():
         remaining, claimed = throttler.remaining_uses(claim_slot=True)
         assert claimed, f"Failed to claim slot for key {throttler.api_key_id}, remaining: {remaining}"
         logger.debug(f"Claimed slot for key {throttler.api_key_id}, remaining: {remaining}")
-    
 
     try:
         get_available_key_for_use(
@@ -106,6 +106,7 @@ def test_get_available_key_for_use():
         logger.info("Test 3 passed: Correctly raised TimeoutError when no keys are available.")
 
     os.remove(tmp_db)
+
 
 if __name__ == "__main__":
     # Uncomment to enable DEBUG logging
