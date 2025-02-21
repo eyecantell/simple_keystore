@@ -1,21 +1,24 @@
-from datetime import datetime, timedelta
-from typing import Tuple, Optional
-import time
+from datetime import timedelta
+from typing import Optional, Tuple
 import redis
+import time
 
 class SKSRateThrottler:
-    """Use Redis to throttle the number of API requests in a rolling window."""
-
     def __init__(
         self,
         api_key_id: int,
         number_of_uses_allowed: int,
         amount_of_time: timedelta,
+        redis_client: Optional[redis.Redis] = None,
         redis_host: str = "localhost",
         redis_port: int = 6379,
         redis_db: int = 0,
     ):
-        self.redis = redis.Redis(host=redis_host, port=redis_port, db=redis_db)
+        if redis_client is None:
+            self.redis = redis.Redis(host=redis_host, port=redis_port, db=redis_db)
+        else:
+            self.redis = redis_client
+
         self.api_key_id = api_key_id
         self._set_rate_limit(number_of_uses_allowed, amount_of_time)
 
@@ -48,6 +51,7 @@ class SKSRateThrottler:
             self.lua_increment_script_sha = self.redis.script_load(lua_increment_script)
         except Exception as e:
             raise RuntimeError(f"Failed to load Lua script: {e}")
+
 
     def _set_rate_limit(self, number_of_uses_allowed: int, amount_of_time: timedelta):
         """Set rate limit values (internal use)."""
