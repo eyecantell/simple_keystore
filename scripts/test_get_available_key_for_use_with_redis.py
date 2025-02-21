@@ -11,6 +11,11 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+logger.setLevel(logging.INFO)
+get_avail_keys_logger = logging.getLogger("simple_keystore.get_available_key_for_use")
+get_avail_keys_logger.setLevel(logging.ERROR)
+
 REDIS_HOST = "localhost"
 REDIS_PORT = 6379
 

@@ -5,12 +5,13 @@ from simple_keystore import SimpleKeyStore, SKSRateThrottler
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,  # Default level
+    level=logging.ERROR,  # Default level
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
 
+logging.error(f"Name is {__name__}")
 
 def get_available_key_for_use(
     key_name: str,
