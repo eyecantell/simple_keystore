@@ -53,7 +53,7 @@ COPY --chown=developer:developer <<EOF /usr/local/bin/docker-entrypoint.sh
 #!/bin/bash
 
 cd /mounted/dev/simple_keystore && pwd
-#pip install -e . 
+pip install -e . 
 python ./scripts/copy_stuff_for_containers_home.py
 
 sudo service redis-server start

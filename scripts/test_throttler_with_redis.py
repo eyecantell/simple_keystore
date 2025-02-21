@@ -6,7 +6,7 @@ def test_rate_throttler():
     throttler = SKSRateThrottler(
         api_key_id=1,
         number_of_uses_allowed=5,
-        amount_of_time=timedelta(seconds=10)
+        amount_of_time=timedelta(seconds=5)
     )
 
     print("Starting test...")
@@ -32,7 +32,7 @@ def test_rate_throttler():
 
     # Test 3: Wait until a slot is available
     print("\nWaiting for a slot to become available...")
-    remaining = throttler.wait_until_available(timeout=15, verbose=True)
+    remaining = throttler.wait_until_available(timeout=7, verbose=True)
     print(f"After waiting, remaining uses: {remaining}")
 
     # Test 4: Check Redis state directly (optional)

@@ -70,6 +70,7 @@ class SKSRateThrottler:
         self.rate_limit_timedelta = amount_of_time
         self.rate_limit_uses_allowed = number_of_uses_allowed
 
+
     def remaining_uses(self, claim_slot: bool = False) -> Tuple[int, bool]:
         """Check if the API key is rate limited and optionally claim a use.
         Returns (remaining: int, slot_claimed: bool)."""
