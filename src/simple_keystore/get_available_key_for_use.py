@@ -11,8 +11,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-logging.error(f"Name is {__name__}")
-
 def get_available_key_for_use(
     key_name: str,
     keystore: SimpleKeyStore,
