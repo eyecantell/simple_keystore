@@ -77,7 +77,9 @@ def test_get_available_key_for_use():
         how_long_to_try_in_seconds=5,
     )
     assert key_record_to_use["key"] == "key2", f"Expected 'key2' after exhausting 'key1', but got {key_record_to_use}"
-    assert remaining_uses == throttler.rate_limit_uses_allowed-1, f"Expected {throttler.rate_limit_uses_allowed-1} uses remaining but got {remaining_uses}"
+    assert remaining_uses == throttler.rate_limit_uses_allowed - 1, (
+        f"Expected {throttler.rate_limit_uses_allowed - 1} uses remaining but got {remaining_uses}"
+    )
     logger.info("Test 2 passed: Got next available key after exhausting first key.")
 
     # Test scenario 3: All keys exhausted

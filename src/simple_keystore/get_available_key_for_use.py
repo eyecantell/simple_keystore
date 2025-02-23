@@ -6,6 +6,7 @@ from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
+
 def get_available_key_for_use(
     key_name: str,
     keystore: SimpleKeyStore,
@@ -75,7 +76,7 @@ def get_available_key_for_use(
 def _attempt_to_grab_a_slot_from_available_keys(
     key_name: str, keystore: SimpleKeyStore, throttler: SKSRateThrottler
 ) -> tuple[dict, int] | None:
-    """Attempts to claim a usage slot for a key from the keystore. 
+    """Attempts to claim a usage slot for a key from the keystore.
     Returns the first successful key record alongside its remaining uses or returns None."""
     matching_records = keystore.get_matching_key_records(name=key_name, active=True)
 
