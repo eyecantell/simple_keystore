@@ -2,13 +2,8 @@ from datetime import timedelta
 import time
 import logging
 from simple_keystore import SimpleKeyStore, SKSRateThrottler
+from typing import Tuple
 
-# Configure logging
-logging.basicConfig(
-    level=logging.ERROR,  # Default level
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
 logger = logging.getLogger(__name__)
 
 def get_available_key_for_use(
@@ -19,8 +14,8 @@ def get_available_key_for_use(
     redis_host: str,
     redis_port: int,
     how_long_to_try_in_seconds: int = 3600,
-) -> str:
-    """Returns the first available key string matching key_name that is active, not expired, and has usage slots available.
+) -> tuple[dict, int]:
+    """Returns the dict for the first available key string matching key_name that is active, not expired, and has usage slots available. Also returns the number of uses remaining for the key.
 
     Args:
         key_name: The name of the key to search for.
@@ -33,7 +28,8 @@ def get_available_key_for_use(
         verbose: Whether to log debug information (default: False).
 
     Returns:
-        str: The key string ready for use.
+        dict: The dict of fields describing the key
+        int: The number of uses remaining for the key
 
     Raises:
         TimeoutError: If no key is available after how_long_to_try_in_seconds.
@@ -53,12 +49,12 @@ def get_available_key_for_use(
 
     while True:
         try:
-            key_record_to_use = _attempt_to_grab_a_slot_from_available_keys(
+            key_record_to_use, remaining_uses = _attempt_to_grab_a_slot_from_available_keys(
                 key_name=key_name, keystore=keystore, throttler=throttler
             )
             if key_record_to_use:
                 logger.debug(f"Found available key: {key_record_to_use}")
-                return key_record_to_use["key"]
+                return (key_record_to_use, remaining_uses)
 
             elapsed = time.time() - start_time
             if elapsed >= how_long_to_try_in_seconds:
@@ -78,8 +74,9 @@ def get_available_key_for_use(
 
 def _attempt_to_grab_a_slot_from_available_keys(
     key_name: str, keystore: SimpleKeyStore, throttler: SKSRateThrottler
-) -> dict | None:
-    """Attempts to claim a usage slot for a key from the keystore. Returns the first successful key record or None."""
+) -> tuple[dict, int] | None:
+    """Attempts to claim a usage slot for a key from the keystore. 
+    Returns the first successful key record alongside its remaining uses or returns None."""
     matching_records = keystore.get_matching_key_records(name=key_name, active=True)
 
     for key_record in matching_records:
@@ -92,8 +89,8 @@ def _attempt_to_grab_a_slot_from_available_keys(
 
         if slot_claimed:
             logger.debug(f"Claimed slot for key {key_name} id {key_record['id']} ({remaining} uses left)")
-            return key_record
+            return (key_record, remaining)
         else:
             logger.debug(f"Key {key_name} id {key_record['id']} has {remaining} uses left - trying next")
 
-    return None
+    return (None, None)

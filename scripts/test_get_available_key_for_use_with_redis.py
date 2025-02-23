@@ -6,7 +6,7 @@ from simple_keystore import SimpleKeyStore, SKSRateThrottler, get_available_key_
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG,  # Default level
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    format="%(asctime)s [%(levelname)s] - %(funcName)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
@@ -38,7 +38,7 @@ def test_get_available_key_for_use():
 
     # Test scenario 1: All keys available
     logger.info("Starting Test 1: All keys available")
-    result = get_available_key_for_use(
+    key_record, remaining_uses = get_available_key_for_use(
         key_name=key_name,
         keystore=ks,
         key_number_of_uses_allowed=3,
@@ -47,7 +47,7 @@ def test_get_available_key_for_use():
         redis_port=REDIS_PORT,
         how_long_to_try_in_seconds=5,
     )
-    assert result == "key1", f"Expected 'key1' as first available key, but got {result}"
+    assert key_record["key"] == "key1", f"Expected 'key1' as first available key, but got {key_record}"
     logger.info("Test 1 passed: Got first available key when all keys are fresh.")
 
     # Test scenario 2: Exhaust "key1"
@@ -67,7 +67,7 @@ def test_get_available_key_for_use():
         assert claimed, f"Failed to claim slot {i + 2} for key1, remaining: {remaining}"
         logger.debug(f"Claimed slot {i + 2} for key1, remaining: {remaining}")
 
-    result = get_available_key_for_use(
+    key_record_to_use, remaining_uses = get_available_key_for_use(
         key_name=key_name,
         keystore=ks,
         key_number_of_uses_allowed=3,
@@ -76,7 +76,8 @@ def test_get_available_key_for_use():
         redis_port=REDIS_PORT,
         how_long_to_try_in_seconds=5,
     )
-    assert result == "key2", f"Expected 'key2' after exhausting 'key1', but got {result}"
+    assert key_record_to_use["key"] == "key2", f"Expected 'key2' after exhausting 'key1', but got {key_record_to_use}"
+    assert remaining_uses == throttler.rate_limit_uses_allowed-1, f"Expected {throttler.rate_limit_uses_allowed-1} uses remaining but got {remaining_uses}"
     logger.info("Test 2 passed: Got next available key after exhausting first key.")
 
     # Test scenario 3: All keys exhausted
