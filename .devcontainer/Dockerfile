@@ -1,4 +1,4 @@
-# Development Dockerfile for simple_keystore with PostgreSQL
+# Development Dockerfile for simple_keystore
 # For use with VS Code Remote Development
 
 FROM python:3.10-slim AS base
@@ -6,27 +6,45 @@ FROM python:3.10-slim AS base
 # Prevent apt from prompting for input
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Combined apt call to minimize layers and install essential packages
+# Install essential packages
 RUN apt-get update && apt-get install -y \
     curl \
+    gh \
     git \
+    locales \
+    npm \
     redis-server \
     sudo \
     tree \
     vim \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
+    && locale-gen
 
 # Create the developer user and set up permissions
 RUN useradd -s /bin/bash -m developer && \
     usermod -aG sudo developer && \
     echo "developer ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
+# Add claude code globally
+RUN npm install -g @anthropic-ai/claude-code
+
+# Install Language Servers (as root, globally available)
+# Python LSP
+RUN pip install --no-cache-dir pyright
+
+# TypeScript/JavaScript LSP
+RUN npm install -g @vtsls/language-server typescript
+
+# Enable LSP tool for claude code
+ENV ENABLE_LSP_TOOL=1
+
 # Switch to developer user for remaining operations
 USER developer
 
 # Set up Python environment
 ENV PATH=/home/developer/.local/bin:$PATH
-WORKDIR /workspace
+WORKDIR /workspaces/simple_keystore
 
 # Install Python packages
 RUN python -m ensurepip --default-pip && \
@@ -46,24 +64,9 @@ RUN pip install --no-cache-dir \
 COPY --chown=developer:developer requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create a script to perform more setup including starting redis
-USER root
+# Add git safe.directory for both volume and mounted paths
+RUN git config --global --add safe.directory /workspaces/simple_keystore && \
+    git config --global --add safe.directory /mounted/dev/simple_keystore
 
-COPY --chown=developer:developer <<EOF /usr/local/bin/docker-entrypoint.sh
-#!/bin/bash
-
-cd /mounted/dev/simple_keystore && pwd
-pip install -e . 
-python ./scripts/copy_stuff_for_containers_home.py
-
-sudo service redis-server start
-sudo service redis-server status
-redis-cli ping
-
-EOF
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-# Switch back to developer user
-USER developer
-
-ENTRYPOINT ["/bin/bash", "-c", "/usr/local/bin/docker-entrypoint.sh && tail -f /dev/null"]
+# Add alias for updating claude code
+RUN echo "alias upc='sudo npm i -g @anthropic-ai/claude-code'" >> /home/developer/.bash_aliases

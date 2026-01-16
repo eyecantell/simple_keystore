@@ -1,34 +1,46 @@
 {
-    "name": "simple_keystore development environment",
-    //"postCreateCommand": "service postgresql status && cd /mounted/dev/simple_keystore && pwd && pdm add --dev -e . && pip install -e . && python ./scripts/copy_stuff_for_containers_home.py",
-    "postCreateCommand": "/usr/local/bin/docker-entrypoint.sh",
-    
+    "name": "simple_keystore dev env",
     "build": {
-      "dockerfile": "Dockerfile",
-      "context": ".."
+        "dockerfile": "Dockerfile",
+        "context": ".."
     },
-    
+
+    // Use a named Docker volume for the workspace (faster than Windows/WSL mount)
+    // To use: Command Palette → "Dev Containers: Clone Repository in Container Volume"
+    // Then enter your repository URL
+    "workspaceFolder": "/workspaces/simple_keystore",
+    "workspaceMount": "source=simple_keystore-workspace,target=/workspaces/simple_keystore,type=volume",
+
     "mounts": [
-      {
-        "type": "bind",
-        "source": "${localEnv:HOME}${localEnv:USERPROFILE}/dev",
-        "target": "/mounted/dev"
-      },
-      // The stuff_for_containers_home mount will have its files copied to the container home dir via scripts/copy_stuff_for_containers_home.py 
-      "source=${localEnv:HOME}${localEnv:USERPROFILE}/stuff_for_containers_home,target=/mounted/stuff_for_containers_home,type=bind,consistency=cached"
+        {
+            "type": "bind",
+            "source": "${localEnv:HOME}${localEnv:USERPROFILE}/dev",
+            "target": "/mounted/dev"
+        },
+        {
+            "source": "${localEnv:HOME}${localEnv:USERPROFILE}/stuff_for_containers_home",
+            "target": "/mounted/stuff_for_containers_home",
+            "type": "bind"
+        }
     ],
+    "remoteUser": "developer",
+    "postCreateCommand": "mkdir -p /mounted/dev/.claude-simple_keystore && ln -sf /mounted/dev/.claude-simple_keystore ~/.claude && pip install -e . && python ./scripts/copy_stuff_for_containers_home.py && sudo service redis-server start",
     "customizations": {
         "vscode": {
             "extensions": [
                 "ms-azuretools.vscode-docker",
                 "ms-python.python",
                 "github.vscode-github-actions",
-                "be5invis.toml"
+                "be5invis.toml",
+                "charliermarsh.ruff"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/usr/local/bin/python",
                 "python.pythonPath": "/usr/local/bin/python"
             }
         }
+    },
+    "remoteEnv": {
+        "ENABLE_LSP_TOOL": "1"
     }
-  }
+}
