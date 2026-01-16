@@ -20,14 +20,15 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
         all_records = ks.get_matching_key_records()
         print(f"Currently have {len(all_records)} records in {ks.name}")
 
+        expired_records = [r for r in all_records if r.get("expired")]
         menu_items = [
             f"[A] Add new key to {ks.name}",
             "[D] Delete a key",
             f"[L] List all {len(all_records)} keys in {ks.name}",
             "[N] Mark key inactive, and get next available.",
+            f"[R] Remove all {len(expired_records)} expired keys",
             f"[S] List the {len(new_records_list)} keys created this session.",
             "[U] Show usability counts report",
-            "[V] TODO Delete unusable (inactive or expired) keys",
             "[X] Exit",
         ]
 
@@ -83,6 +84,23 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
                 print(f"No keys left with name {record['name']}")
             else:
                 print(f"Next available key with name {record['name']} is:\n{next_key}")
+
+        elif choice == "R":
+            # Remove all expired keys
+            if not expired_records:
+                print("No expired keys to remove.")
+                continue
+            print(f"Found {len(expired_records)} expired keys:")
+            show_records(ks, expired_records)
+            confirm = get_input(f"Delete all {len(expired_records)} expired keys? (yes/no)", default="no")
+            if confirm.lower() == "yes":
+                deleted_count = 0
+                for record in expired_records:
+                    ks.delete_key_record(unencrypted_key=record["key"])
+                    deleted_count += 1
+                print(f"Deleted {deleted_count} expired keys.")
+            else:
+                print("Deletion cancelled.")
 
         elif choice == "S":
             # Show keys created this session
