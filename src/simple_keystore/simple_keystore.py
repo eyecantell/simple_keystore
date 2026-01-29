@@ -1,5 +1,5 @@
 from cryptography.fernet import Fernet
-from datetime import datetime, timedelta
+from datetime import datetime
 from tabulate import tabulate
 from typing import Any, Dict, List
 import os
@@ -327,7 +327,7 @@ class SimpleKeyStore:
                     key_value = str(rec.get(header))
                     if header == "key" and show_full_key:
                         value = key_value
-                    elif len(value) > 20:
+                    elif len(key_value) > 20:
                         value = key_value[:8] + "..." + key_value[-8:]
                     else:
                         value = key_value

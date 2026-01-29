@@ -597,6 +597,21 @@ def test_get_next_usable_key():
     ks.delete_records_with_name(my_key_name)
 
 
+def test_tabulate_records_truncates_long_key():
+    """Regression test: tabulate_records with show_full_key=False must not crash on keys longer than 20 chars."""
+    my_key_name = "test_tabulate_records_truncates_long_key"
+    long_key_value = "abcdefghijklmnopqrstuvwxyz0123456789"  # 36 chars, > 20
+    ks.delete_records_with_name(my_key_name)
+    ks.add_key(name=my_key_name, unencrypted_key=long_key_value)
+
+    records = ks.get_matching_key_records(name=my_key_name)
+    tabulated = ks.tabulate_records(records, show_full_key=False)
+    assert "..." in tabulated, f"Expected '...' in truncated output, but got:\n{tabulated}"
+
+    # Clean up
+    ks.delete_records_with_name(my_key_name)
+
+
 def test_record_is_in_set():
     # Setup
     my_key_name = "test_record_is_in_set"

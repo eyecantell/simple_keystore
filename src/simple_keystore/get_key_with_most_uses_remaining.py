@@ -3,13 +3,21 @@ from datetime import timedelta
 from typing import Optional
 
 
-def get_key_with_most_uses_remaining(key_name: str, keystore: SimpleKeyStore, verbose: bool = False) -> Optional[int]:
+def get_key_with_most_uses_remaining(
+    key_name: str,
+    keystore: SimpleKeyStore,
+    throttler: Optional[SKSRateThrottler] = None,
+    verbose: bool = False,
+) -> Optional[int]:
     """
     Retrieve the ID of the key with the most remaining uses for a given key name.
 
     Args:
         key_name (str): The name of the key to search for
         keystore (SimpleKeyStore): The keystore instance to query
+        throttler (Optional[SKSRateThrottler]): An existing throttler to reuse. When provided,
+            api_key_id is passed per-call. When None, a new throttler is created per key
+            with hardcoded defaults (preserves backward compatibility).
         verbose (bool): If True, print remaining uses for each key (default: False)
 
     Returns:
@@ -30,13 +38,15 @@ def get_key_with_most_uses_remaining(key_name: str, keystore: SimpleKeyStore, ve
         if not record["usable"]:
             continue
 
-        # Initialize throttler to check remaining uses
-        throttler = SKSRateThrottler(
-            api_key_id=record["id"], number_of_uses_allowed=10, amount_of_time=timedelta(seconds=5)
-        )
-
-        # Get remaining uses without claiming a slot
-        remaining, _ = throttler.remaining_uses(claim_slot=False)
+        if throttler is not None:
+            # Reuse provided throttler with per-call api_key_id
+            remaining, _ = throttler.remaining_uses(claim_slot=False, api_key_id=record["id"])
+        else:
+            # Create a new throttler per key (backward-compatible default)
+            per_key_throttler = SKSRateThrottler(
+                api_key_id=record["id"], number_of_uses_allowed=10, amount_of_time=timedelta(seconds=5)
+            )
+            remaining, _ = per_key_throttler.remaining_uses(claim_slot=False)
 
         # Optional verbose output
         if verbose:

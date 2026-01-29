@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `SimpleKeyStore` - Core encrypted key storage with metadata (name, source, login, batch, expiration dates)
 - `SKSRateThrottler` - Redis-based rate limiting using a Lua script (class-level `_LUA_SCRIPT`) for atomic sliding-window operations
 - `get_available_key_for_use()` - High-level API combining storage + throttling with exponential backoff
-- `get_key_with_most_uses_remaining()` - Utility to find the least-loaded key
+- `get_key_with_most_uses_remaining()` - Utility to find the least-loaded key (accepts optional `throttler` for reuse)
 - `manage_simple_keys` - Interactive CLI for key management
 
 ## Commands

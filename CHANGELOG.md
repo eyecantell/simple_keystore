@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 - Read-only `redis` property and read/write `api_key_id` property on `SKSRateThrottler` for backward-compatible access.
 - New unit tests for connection ownership, per-call `api_key_id`, timeout, backoff, and verbose output.
 - `CONTRIBUTING.md` with development setup, architecture, testing, and code style.
+- `get_key_with_most_uses_remaining()` accepts optional `throttler` parameter for reusing rate limiters.
+- PyPI classifiers for package discoverability.
 
 ### Changed
 - `README.md` rewritten as user-facing documentation with usage examples and API reference.
@@ -22,6 +24,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - `remaining_uses()` now raises `RuntimeError` (not bare `Exception`) with chained cause (`from e`).
+- `UnboundLocalError` in `tabulate_records()` when `show_full_key=False` and key length exceeds 20 characters.
+- Removed unused `timedelta` import from `simple_keystore.py`.
+- Added `*.db` to `.gitignore` for temporary database files.
 
 ## [0.9.0] - 2025-01-22
 

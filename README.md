@@ -172,9 +172,9 @@ Provides an interactive menu for adding, removing, activating/deactivating, and 
 
 Finds and claims an available key matching `key_name` with rate limiting. Returns `(key_record, remaining_uses)`. Retries with exponential backoff.
 
-### `get_key_with_most_uses_remaining(key_name, keystore, verbose=False)`
+### `get_key_with_most_uses_remaining(key_name, keystore, throttler=None, verbose=False)`
 
-Returns the id of the key with the most remaining rate-limit uses, or `None`.
+Returns the id of the key with the most remaining rate-limit uses, or `None`. When `throttler` is provided, it is reused with per-call `api_key_id`; when `None`, a new throttler is created per key with hardcoded defaults.
 
 ## License
 

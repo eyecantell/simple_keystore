@@ -1,6 +1,5 @@
 import os
 from datetime import timedelta
-from dateutil.relativedelta import relativedelta
 from simple_keystore import SimpleKeyStore, SKSRateThrottler, get_key_with_most_uses_remaining
 
 
@@ -20,54 +19,55 @@ def test_get_key_with_most_uses_remaining():
     ks.add_key(key_name, "bbbb", active=True)
     ks.add_key(key_name, "cccc", active=True)
 
-    # Get key records and initialize throttlers
-    key_records = ks.get_matching_key_records(name=key_name)
-    throttler_by_id = {
-        record["id"]: SKSRateThrottler(
-            api_key_id=record["id"], number_of_uses_allowed=10, amount_of_time=timedelta(seconds=5)
-        )
-        for record in key_records
-    }
+    # Use a single shared throttler for all keys
+    shared_throttler = SKSRateThrottler(
+        api_key_id=0, number_of_uses_allowed=10, amount_of_time=timedelta(seconds=5)
+    )
 
-    # Verify initial state of throttlers
-    for throttler in throttler_by_id.values():
-        remaining, _ = throttler.remaining_uses(claim_slot=False)
-        assert remaining == throttler.rate_limit_uses_allowed, (
-            f"Expected throttler {throttler.api_key_id} to start with "
-            f"{throttler.rate_limit_uses_allowed} uses, but got {remaining} - "
+    # Verify initial state for each key
+    key_records = ks.get_matching_key_records(name=key_name)
+    for record in key_records:
+        remaining, _ = shared_throttler.remaining_uses(claim_slot=False, api_key_id=record["id"])
+        assert remaining == shared_throttler.rate_limit_uses_allowed, (
+            f"Expected key {record['id']} to start with "
+            f"{shared_throttler.rate_limit_uses_allowed} uses, but got {remaining} - "
             "this script may have been run too quickly back to back"
         )
 
-    # Test scenario 1: Claim uses from keys 0 and 1, expect key 2 to have most uses
-    remaining_tuple = throttler_by_id[3].remaining_uses(claim_slot=True)
+    # Test scenario 1: Claim uses from keys 3 and 1, expect key 2 to have most uses
+    remaining_tuple = shared_throttler.remaining_uses(claim_slot=True, api_key_id=3)
     assert remaining_tuple == (9, True), (
         f"Failed to claim use for api_key_id 3, expected (9, True) but got {remaining_tuple}"
     )
-    remaining_tuple = throttler_by_id[1].remaining_uses(claim_slot=True)
+    remaining_tuple = shared_throttler.remaining_uses(claim_slot=True, api_key_id=1)
     assert remaining_tuple == (9, True), (
         f"Failed to claim use for api_key_id 1, expected (9, True) but got {remaining_tuple}"
     )
-    key_with_most = get_key_with_most_uses_remaining(key_name=key_name, keystore=ks)
+    key_with_most = get_key_with_most_uses_remaining(
+        key_name=key_name, keystore=ks, throttler=shared_throttler
+    )
     assert key_with_most == 2, f"Expected key 2 to have most uses, but got {key_with_most}"
 
     # Test scenario 2: Claim more uses, expect key 1 to have most uses
-    remaining_tuple = throttler_by_id[2].remaining_uses(claim_slot=True)
+    remaining_tuple = shared_throttler.remaining_uses(claim_slot=True, api_key_id=2)
     assert remaining_tuple == (9, True), (
         f"Failed to claim use for api_key_id 2, expected (9, True) but got {remaining_tuple}"
     )
-    remaining_tuple = throttler_by_id[2].remaining_uses(claim_slot=True)
+    remaining_tuple = shared_throttler.remaining_uses(claim_slot=True, api_key_id=2)
     assert remaining_tuple == (8, True), (
         f"Failed to claim use for api_key_id 2, expected (8, True) but got {remaining_tuple}"
     )
-    remaining_tuple = throttler_by_id[3].remaining_uses(claim_slot=True)
+    remaining_tuple = shared_throttler.remaining_uses(claim_slot=True, api_key_id=3)
     assert remaining_tuple == (8, True), (
         f"Failed to claim use for api_key_id 3, expected (8, True) but got {remaining_tuple}"
     )
-    remaining_tuple = throttler_by_id[3].remaining_uses(claim_slot=True)
+    remaining_tuple = shared_throttler.remaining_uses(claim_slot=True, api_key_id=3)
     assert remaining_tuple == (7, True), (
         f"Failed to claim use for api_key_id 3, expected (7, True) but got {remaining_tuple}"
     )
-    key_with_most = get_key_with_most_uses_remaining(key_name=key_name, keystore=ks)
+    key_with_most = get_key_with_most_uses_remaining(
+        key_name=key_name, keystore=ks, throttler=shared_throttler
+    )
     assert key_with_most == 1, f"Expected key 1 to have most uses, but got {key_with_most}"
 
     # Cleanup
