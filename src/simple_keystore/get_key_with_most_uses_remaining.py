@@ -1,27 +1,26 @@
 from simple_keystore import SimpleKeyStore, SKSRateThrottler
 from datetime import timedelta
-from typing import Optional
 
 
 def get_key_with_most_uses_remaining(
     key_name: str,
     keystore: SimpleKeyStore,
-    throttler: Optional[SKSRateThrottler] = None,
+    throttler: SKSRateThrottler | None = None,
     verbose: bool = False,
-) -> Optional[int]:
+) -> int | None:
     """
     Retrieve the ID of the key with the most remaining uses for a given key name.
 
     Args:
         key_name (str): The name of the key to search for
         keystore (SimpleKeyStore): The keystore instance to query
-        throttler (Optional[SKSRateThrottler]): An existing throttler to reuse. When provided,
+        throttler (SKSRateThrottler | None): An existing throttler to reuse. When provided,
             api_key_id is passed per-call. When None, a new throttler is created per key
             with hardcoded defaults (preserves backward compatibility).
         verbose (bool): If True, print remaining uses for each key (default: False)
 
     Returns:
-        Optional[int]: The ID of the key with the most remaining uses, or None if no usable keys found
+        int | None: The ID of the key with the most remaining uses, or None if no usable keys found
     """
     # Fetch all active key records matching the given name
     key_records = keystore.get_matching_key_records(
@@ -30,7 +29,7 @@ def get_key_with_most_uses_remaining(
     )
 
     # Track the key with maximum remaining uses
-    max_key_id: Optional[int] = None
+    max_key_id: int | None = None
     max_uses: int = -1
 
     # Evaluate each key record

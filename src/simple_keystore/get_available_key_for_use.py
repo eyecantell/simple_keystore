@@ -2,7 +2,6 @@ from datetime import timedelta
 import time
 import logging
 from simple_keystore import SimpleKeyStore, SKSRateThrottler
-from typing import Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ def get_available_key_for_use(
     redis_port: int,
     how_long_to_try_in_seconds: int = 3600,
     max_wait_cap_in_seconds: float = 180.0,
-) -> Tuple[dict, int]:
+) -> tuple[dict, int]:
     """Returns the dict for the first available key string matching key_name that is active, not expired,
     and has usage slots available. Also returns the number of uses remaining for the key.
 
@@ -31,7 +30,7 @@ def get_available_key_for_use(
         max_wait_cap_in_seconds: Maximum time to wait between retries (default: 180.0).
 
     Returns:
-        Tuple[dict, int]: The key record dictionary and the number of uses remaining.
+        tuple[dict, int]: The key record dictionary and the number of uses remaining.
 
     Raises:
         TimeoutError: If no key is available after how_long_to_try_in_seconds.
@@ -97,7 +96,7 @@ def get_available_key_for_use(
 
 def _attempt_to_grab_a_slot_from_available_keys(
     key_name: str, keystore: SimpleKeyStore, throttler: SKSRateThrottler
-) -> Tuple[Optional[dict], Optional[int]]:
+) -> tuple[dict | None, int | None]:
     """Attempts to claim a usage slot for a key from the keystore.
     Returns the first successful key record alongside its remaining uses or (None, None) if unsuccessful."""
     matching_records = keystore.get_matching_key_records(name=key_name, active=True)

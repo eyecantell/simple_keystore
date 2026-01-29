@@ -1,7 +1,7 @@
 from cryptography.fernet import Fernet
 from datetime import datetime
 from tabulate import tabulate
-from typing import Any, Dict, List
+from typing import Any
 import os
 import sqlite3
 
@@ -13,6 +13,7 @@ class SimpleKeyStore:
         self.cx = sqlite3.connect(self.name)
         self.cipher = Fernet(self.keystore_key)
         self.KEYSTORE_TABLE_NAME = "keystore"
+        self.EXPIRATION_PROXIMITY_WINDOW_SECONDS = 12 * 3600
         self.create_keystore_table_if_dne()
 
         self.set_defining_fields = ["name", "source", "login", "batch"]
@@ -34,6 +35,25 @@ class SimpleKeyStore:
                 secrets = netrc.netrc().authenticators("SIMPLE_KEYSTORE_KEY")
                 if secrets:
                     simple_keystore_key = secrets[2]
+
+                    # Warn if .netrc has overly permissive file permissions (non-Windows only)
+                    import platform
+
+                    if platform.system() != "Windows":
+                        try:
+                            import stat
+                            import warnings
+
+                            netrc_path = os.path.expanduser("~/.netrc")
+                            mode = os.stat(netrc_path).st_mode
+                            if mode & (stat.S_IRGRP | stat.S_IROTH):
+                                warnings.warn(
+                                    f"~/.netrc has insecure permissions ({oct(mode & 0o777)}). "
+                                    "Consider running: chmod 600 ~/.netrc",
+                                    stacklevel=2,
+                                )
+                        except OSError:
+                            pass  # Skip check on unusual filesystems (NFS, FUSE, etc.)
                 else:
                     raise ValueError("No SIMPLE_KEYSTORE_KEY key found in .netrc file.")
             except (FileNotFoundError, netrc.NetrcParseError, ValueError) as e:
@@ -112,7 +132,7 @@ class SimpleKeyStore:
         # print("Added key with id", cursor.lastrowid)
         return cursor.lastrowid
 
-    def _record_dicts_from_select_star_results(self, records: list) -> List[Dict]:
+    def _record_dicts_from_select_star_results(self, records: list) -> list[dict]:
         records_list = []
         for r in records:
             record_data = self._get_dict_from_record_tuple(r)
@@ -161,16 +181,16 @@ class SimpleKeyStore:
 
         return records[0]["key"]
 
-    def get_key_record_by_id(self, id: int) -> Dict:
+    def get_key_record_by_id(self, id: int) -> dict:
         """Returns key record for the key with the given id."""
 
-        cursor = self.cx.execute(f"SELECT * FROM {self.KEYSTORE_TABLE_NAME} WHERE id={int(id)}")
+        cursor = self.cx.execute(f"SELECT * FROM {self.KEYSTORE_TABLE_NAME} WHERE id=?", (int(id),))
         records = self._record_dicts_from_select_star_results(cursor.fetchall())
         if not records:
             return None
         return records[0]
 
-    def get_key_record(self, unencrypted_key: str) -> Dict:
+    def get_key_record(self, unencrypted_key: str) -> dict:
         """Returns key record for the given (unencrypted) key."""
 
         # Because the salt value changes with each encryption, we have to decrypt each key to check against this one
@@ -210,8 +230,8 @@ class SimpleKeyStore:
         batch: str = None,
         source: str = None,
         login: str = None,
-        sort_order: List = None,
-    ) -> List[Dict]:
+        sort_order: list = None,
+    ) -> list[dict]:
         """Retrieve the keystore records matching the given parameters. Any parameters that are None are ignored.
         Sort order can be specified using any/all of the columns including calculated ones (expired, usable, expiration_date)"""
 
@@ -266,7 +286,7 @@ class SimpleKeyStore:
     def run_query_with_where_clause(self, query: str, **kwargs) -> sqlite3.Cursor:
         """Build the WHERE clause for based on the provided key-value pairs and execute the given query. Returns the Cursor."""
         conditions = []
-        values: List[Any] = []
+        values: list[Any] = []
 
         # Create parameterized conditions based on the parameters passed
         for field in self.keystore_columns():
@@ -296,9 +316,9 @@ class SimpleKeyStore:
 
     def tabulate_records(
         self,
-        records: List[Dict],
-        headers: List = None,
-        sort_order: List = None,
+        records: list[dict],
+        headers: list = None,
+        sort_order: list = None,
         show_full_key: bool = False,
         show_index: bool = True,
     ) -> str:
@@ -367,8 +387,8 @@ class SimpleKeyStore:
         self,
         key_name: str = None,
         print_records: bool = False,
-        sort_order: List = ["name", "source", "login", "batch", "active", "expiration_date"],
-    ) -> List[Dict]:
+        sort_order: list = ["name", "source", "login", "batch", "active", "expiration_date"],
+    ) -> list[dict]:
         """Get list of sorted key records with the given name. Gets ALL if no name given.
         Will print a tabulated list of the records if print_records is True"""
         key_records = self.get_matching_key_records(name=key_name, sort_order=sort_order)
@@ -387,7 +407,7 @@ class SimpleKeyStore:
 
     def usability_counts_report(
         self, key_name: str = None, print_records: bool = False, print_counts=False
-    ) -> List[Dict]:
+    ) -> list[dict]:
         usability_records = self.records_for_usability_report(key_name, print_records)
 
         # Count the number of usable records for each set, where a set is combo of name, source, login, batch
@@ -414,7 +434,7 @@ class SimpleKeyStore:
         params = {}
         set_clause = []
 
-        if type(id_to_update).__name__ != "int":
+        if not isinstance(id_to_update, int):
             raise ValueError(f"Expected id_to_update to be an integer, but got {type(id_to_update)}={id_to_update}")
 
         if name is not None:
@@ -466,7 +486,7 @@ class SimpleKeyStore:
 
         return number_of_records_updated
 
-    def get_sets_of_records_with_counts(self, records: List[Dict]):
+    def get_sets_of_records_with_counts(self, records: list[dict]):
         """Return a list of the record sets with their counts. Each set of records share name, source, login and batch."""
 
         count_fields = ["total", "active", "expired", "usable"]
@@ -528,7 +548,7 @@ class SimpleKeyStore:
         # print(f"{set_records_list=}")
         return set_records_list
 
-    def record_is_in_set(self, record: Dict, record_set: Dict) -> bool:
+    def record_is_in_set(self, record: dict, record_set: dict) -> bool:
         """Returns true if record and set match on all the set defining fields"""
         # print("record_is_in_set checking:")
 
@@ -541,8 +561,8 @@ class SimpleKeyStore:
             # print(f"    {record[field]} == {record_set[field]}")
         return True
 
-    def get_set_for_record(self, record: Dict, record_set_list: List[Dict]) -> Dict:
-        """Returns the record set (Dict) of the set that matches the given record."""
+    def get_set_for_record(self, record: dict, record_set_list: list[dict]) -> dict:
+        """Returns the record set (dict) of the set that matches the given record."""
         for record_set in record_set_list:
             if self.record_is_in_set(record, record_set):
                 # print("Found record set for record")
@@ -580,12 +600,11 @@ class SimpleKeyStore:
 
         # Get the records that are soonest to expire (within 12 hours)
         soon_to_expire_records = []
-        twelve_hours_in_seconds = 12 * 3600
         for record in matching_records:
             if record["expiration_date"] is None:
                 continue
             time_diff = record["expiration_date"] - soonest_expiration
-            if time_diff.total_seconds() < twelve_hours_in_seconds:
+            if time_diff.total_seconds() < self.EXPIRATION_PROXIMITY_WINDOW_SECONDS:
                 soon_to_expire_records.append(record)
 
         # print(self.tabulate_records(soon_to_expire_records, headers=['id','name','expiration_date','key'] + self.set_defining_fields))

@@ -1,11 +1,11 @@
-from typing import Any, Dict, List, Tuple
+from typing import Any
 from simple_keystore import SimpleKeyStore
 from datetime import datetime, timedelta
 import argparse
 import os
 
 
-def show_records(ks: SimpleKeyStore, records: List):
+def show_records(ks: SimpleKeyStore, records: list):
     headers = ["id"] + ks.set_defining_fields + ["expiration_date", "expired", "usable", "key"]
     print(ks.tabulate_records(records, headers))
 
@@ -114,7 +114,7 @@ def manage_keys(ks: SimpleKeyStore, defaults: dict = {}):
             ks.usability_counts_report(print_counts=True)
 
 
-def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}) -> Tuple[Dict, Dict]:
+def add_single_key_interactive(ks: SimpleKeyStore, defaults: dict = {}) -> tuple[dict, dict]:
     """Prompt user for entries to create a single key record. Returns a dict of the new record values, and the answers given."""
     required_fields = ["name"]
     answer = {}
@@ -161,21 +161,25 @@ def get_input(question: str, required: bool = False, default: Any = None) -> Any
             return answer
 
 
-def get_expiration_seconds_from_input(default) -> Tuple[int, str]:
+def get_expiration_seconds_from_input(default) -> tuple[int, str]:
     """Gets user input for expiration date. Returns seconds since epoch and answer given"""
     expiration_input = get_input(
         "Enter the expiration time in number of days or a specific date (YYYY-MM-DD): ", default=default
     )
 
     if not expiration_input:
-        return None
+        return (None, None)
     try:
         # Attempt to parse input as an integer (days)
         expiration_days = int(expiration_input)
         expiration_date = datetime.now() + timedelta(days=expiration_days)
     except ValueError:
-        # If input is not an integer, assume it is a date in format YYYY-MM-DD
-        expiration_date = datetime.strptime(expiration_input, "%Y-%m-%d")
+        try:
+            # If input is not an integer, assume it is a date in format YYYY-MM-DD
+            expiration_date = datetime.strptime(expiration_input, "%Y-%m-%d")
+        except ValueError:
+            print(f"Invalid expiration input: '{expiration_input}'. Expected number of days or YYYY-MM-DD date.")
+            return (None, None)
 
     expiration_seconds = int(expiration_date.timestamp())
 

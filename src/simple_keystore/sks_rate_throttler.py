@@ -1,5 +1,5 @@
+from collections.abc import Callable
 from datetime import timedelta
-from typing import Callable, Optional, Tuple
 
 import redis
 import time
@@ -45,7 +45,7 @@ class SKSRateThrottler:
         api_key_id: int,
         number_of_uses_allowed: int,
         amount_of_time: timedelta,
-        redis_client: Optional[redis.Redis] = None,
+        redis_client: redis.Redis | None = None,
         redis_host: str = "localhost",
         redis_port: int = 6379,
         redis_db: int = 0,
@@ -85,7 +85,7 @@ class SKSRateThrottler:
         self.rate_limit_timedelta = amount_of_time
         self.rate_limit_uses_allowed = number_of_uses_allowed
 
-    def remaining_uses(self, claim_slot: bool = False, api_key_id: Optional[int] = None) -> Tuple[int, bool]:
+    def remaining_uses(self, claim_slot: bool = False, api_key_id: int | None = None) -> tuple[int, bool]:
         """Check if the API key is rate limited and optionally claim a use.
         Args:
             claim_slot: If True, attempt to claim a usage slot.
@@ -119,9 +119,9 @@ class SKSRateThrottler:
         self,
         timeout: int = 7200,
         verbose: bool = False,
-        api_key_id: Optional[int] = None,
-        sleep_func: Optional[Callable[[float], None]] = None,
-        clock_func: Optional[Callable[[], float]] = None,
+        api_key_id: int | None = None,
+        sleep_func: Callable[[float], None] | None = None,
+        clock_func: Callable[[], float] | None = None,
     ) -> int:
         """Block until an API key slot is claimed or timeout occurs.
         Args:
