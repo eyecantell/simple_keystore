@@ -44,7 +44,7 @@ def get_key_with_most_uses_remaining(key_name: str, keystore: SimpleKeyStore, ve
 
         # Update max if this key has more remaining uses
         if remaining > max_uses:
-            max_key_id = throttler.api_key_id
+            max_key_id = record["id"]
             max_uses = remaining
 
     return max_key_id

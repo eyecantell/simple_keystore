@@ -6,6 +6,7 @@ from typing import Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
+
 def get_available_key_for_use(
     key_name: str,
     keystore: SimpleKeyStore,
@@ -16,7 +17,7 @@ def get_available_key_for_use(
     how_long_to_try_in_seconds: int = 3600,
     max_wait_cap_in_seconds: float = 180.0,
 ) -> Tuple[dict, int]:
-    """Returns the dict for the first available key string matching key_name that is active, not expired, 
+    """Returns the dict for the first available key string matching key_name that is active, not expired,
     and has usage slots available. Also returns the number of uses remaining for the key.
 
     Args:
@@ -62,21 +63,25 @@ def get_available_key_for_use(
             key_record_to_use, remaining_uses = _attempt_to_grab_a_slot_from_available_keys(
                 key_name=key_name, keystore=keystore, throttler=throttler
             )
-            
+
             if key_record_to_use:
                 logger.debug(f"Found available key after {attempt_count} attempts: {key_record_to_use}")
                 return (key_record_to_use, remaining_uses)
 
             elapsed = time.time() - start_time
             if elapsed >= how_long_to_try_in_seconds:
-                logger.error(f"No {key_name} keys available after {how_long_to_try_in_seconds}s and {attempt_count} attempts")
+                logger.error(
+                    f"No {key_name} keys available after {how_long_to_try_in_seconds}s and {attempt_count} attempts"
+                )
                 raise TimeoutError(f"No {key_name} keys available after {how_long_to_try_in_seconds}s")
 
             # Calculate actual wait time with cap
             actual_wait = min(wait_time_in_seconds, max_wait_cap_in_seconds)
-            logger.info(f"No keys available on attempt {attempt_count}. Retrying in {actual_wait:.1f}s (elapsed: {elapsed:.1f}s)")
+            logger.info(
+                f"No keys available on attempt {attempt_count}. Retrying in {actual_wait:.1f}s (elapsed: {elapsed:.1f}s)"
+            )
             time.sleep(actual_wait)
-            
+
             # Exponential backoff with cap
             wait_time_in_seconds = min(wait_time_in_seconds * 1.5, max_wait_cap_in_seconds)
 
@@ -89,10 +94,9 @@ def get_available_key_for_use(
             logger.error(f"Unexpected error on attempt {attempt_count}: {str(e)}")
             raise
 
+
 def _attempt_to_grab_a_slot_from_available_keys(
-    key_name: str, 
-    keystore: SimpleKeyStore, 
-    throttler: SKSRateThrottler
+    key_name: str, keystore: SimpleKeyStore, throttler: SKSRateThrottler
 ) -> Tuple[Optional[dict], Optional[int]]:
     """Attempts to claim a usage slot for a key from the keystore.
     Returns the first successful key record alongside its remaining uses or (None, None) if unsuccessful."""
@@ -107,8 +111,7 @@ def _attempt_to_grab_a_slot_from_available_keys(
             logger.debug(f"Skipping unusable key {key_name} id {key_record['id']}")
             continue
 
-        throttler.api_key_id = key_record["id"]
-        remaining, slot_claimed = throttler.remaining_uses(claim_slot=True)
+        remaining, slot_claimed = throttler.remaining_uses(claim_slot=True, api_key_id=key_record["id"])
 
         if slot_claimed:
             logger.debug(f"Claimed slot for key {key_name} id {key_record['id']} ({remaining} uses left)")

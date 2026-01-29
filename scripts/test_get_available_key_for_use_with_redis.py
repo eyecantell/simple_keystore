@@ -86,18 +86,16 @@ def test_get_available_key_for_use():
     logger.info("Starting Test 3: Exhaust all keys")
 
     # Exhaust the remaining key2 uses
-    throttler.api_key_id = 2
     for i in range(2):
-        remaining, claimed = throttler.remaining_uses(claim_slot=True)
-        assert claimed, f"Failed to claim slot for key {throttler.api_key_id}, remaining: {remaining}"
-        logger.debug(f"Claimed slot for key {throttler.api_key_id}, remaining: {remaining}")
+        remaining, claimed = throttler.remaining_uses(claim_slot=True, api_key_id=2)
+        assert claimed, f"Failed to claim slot for key 2, remaining: {remaining}"
+        logger.debug(f"Claimed slot for key 2, remaining: {remaining}")
 
     # Exhaust the key3 uses
-    throttler.api_key_id = 3
     for i in range(3):
-        remaining, claimed = throttler.remaining_uses(claim_slot=True)
-        assert claimed, f"Failed to claim slot for key {throttler.api_key_id}, remaining: {remaining}"
-        logger.debug(f"Claimed slot for key {throttler.api_key_id}, remaining: {remaining}")
+        remaining, claimed = throttler.remaining_uses(claim_slot=True, api_key_id=3)
+        assert claimed, f"Failed to claim slot for key 3, remaining: {remaining}"
+        logger.debug(f"Claimed slot for key 3, remaining: {remaining}")
 
     try:
         get_available_key_for_use(
