@@ -1,6 +1,6 @@
 [project]
 name = "simple_keystore"
-version = "0.10.0"
+version = "0.11.0"
 description = "A simple encrypted key storage with optional Redis-based rate limiting"
 authors = [
     {name = "Paul", email = "paul@nowfree.org"},

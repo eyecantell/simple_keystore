@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+## [0.11.0] - 2025-01-29
+
+### Added
+- GitHub Actions CI workflow with lint (ruff) and test (pytest) jobs across Python 3.10–3.13.
+- `pdm.lock` now includes the `test` dependency group.
+
 ## [0.10.0] - 2025-01-29
 
 ### Added
