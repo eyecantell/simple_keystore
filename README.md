@@ -136,7 +136,11 @@ This iterates through matching keys, attempts to claim a rate-limit slot for eac
 ### CLI
 
 ```bash
+# If console scripts are on your PATH (standard pip install):
 manage_simple_keys my_keys.db
+
+# Works in any installation setup (PDM, virtualenv, etc.):
+python -m simple_keystore my_keys.db
 ```
 
 Provides an interactive menu for adding, removing, activating/deactivating, and listing keys.
